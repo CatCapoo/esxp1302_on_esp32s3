@@ -43,19 +43,19 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #define ADDR_MASK       0x7fff
 
 #ifndef PIN_NUM_MISO
-#define PIN_NUM_MISO 12
+#define PIN_NUM_MISO 13
 #endif
 
 #ifndef PIN_NUM_MOSI
-#define PIN_NUM_MOSI 13
+#define PIN_NUM_MOSI 11
 #endif
 
 #ifndef PIN_NUM_CLK
-#define PIN_NUM_CLK  14
+#define PIN_NUM_CLK  12
 #endif
 
 #ifndef PIN_NUM_CS
-#define PIN_NUM_CS   15
+#define PIN_NUM_CS   14
 #endif
 
 #define USE_SPI_TRANSACTION_EXT

@@ -1,0 +1,68 @@
+menu "Test files selection"
+
+config TEST_ORIGINAL_SPI_TEST
+    bool "original_spi_test.c"
+    help
+      Enable original_spi_test.c (app_main).
+
+config TEST_SPI_MAIN
+    bool "spi_main.c"
+    help
+      Enable spi_main.c (app_main).
+
+config TEST_LORAGW_CAL
+    bool "test_loragw_cal.c"
+    help
+      Enable test_loragw_cal.c (app_main).
+
+config TEST_LORAGW_CAPTURE_RAM
+    bool "test_loragw_capture_ram.c"
+    help
+      Enable test_loragw_capture_ram.c (app_main).
+
+config TEST_LORAGW_COUNTER
+    bool "test_loragw_counter.c"
+    help
+      Enable test_loragw_counter.c (app_main).
+
+config TEST_LORAGW_GPS
+    bool "test_loragw_gps.c"
+    help
+      Enable test_loragw_gps.c (app_main).
+
+config TEST_LORAGW_HAL_RX
+    bool "test_loragw_hal_rx.c"
+    help
+      Enable test_loragw_hal_rx.c (app_main).
+
+config TEST_LORAGW_HAL_TX
+    bool "test_loragw_hal_tx.c"
+    help
+      Enable test_loragw_hal_tx.c (app_main).
+
+config TEST_LORAGW_I2C
+    bool "test_loragw_i2c.c"
+    help
+      Enable test_loragw_i2c.c (app_main).
+
+config TEST_LORAGW_REG
+    bool "test_loragw_reg.c"
+    help
+      Enable test_loragw_reg.c (app_main).
+
+config TEST_LORAGW_SPI
+    bool "test_loragw_spi.c"
+    help
+      Enable test_loragw_spi.c (app_main).
+
+config TEST_LORAGW_SPI_SX1250
+    bool "test_loragw_spi_sx1250.c"
+    help
+      Enable test_loragw_spi_sx1250.c (app_main).
+
+config TEST_NETWORK_CONNECTION
+    bool "test_network_connection.c"
+    help
+      Enable test_network_connection.c (app_main).
+
+endmenu

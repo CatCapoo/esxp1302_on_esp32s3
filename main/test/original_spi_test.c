@@ -22,16 +22,16 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #include "driver/gpio.h"
 
 
-#define PIN_NUM_MISO 12
-#define PIN_NUM_MOSI 13
-#define PIN_NUM_CLK  14
-#define PIN_NUM_CS   15
+#define PIN_NUM_MISO 13
+#define PIN_NUM_MOSI 11
+#define PIN_NUM_CLK  12
+#define PIN_NUM_CS   14
 
 #ifndef SX1302_SPI_HOST
 #define SX1302_SPI_HOST    HSPI_HOST
 #endif
 
-#define DMA_CHAN    2
+#define DMA_CHAN    SPI_DMA_CH_AUTO
 
 // get sx1302 version
 uint8_t spi_get_version(spi_device_handle_t spi, const uint8_t *buf, int len)
@@ -46,9 +46,19 @@ uint8_t spi_get_version(spi_device_handle_t spi, const uint8_t *buf, int len)
     t.rx_buffer = rbuf;
 
     ret = spi_device_polling_transmit(spi, &t);
-    assert(ret == ESP_OK);
+    if (ret != ESP_OK) {
+        printf("spi_device_polling_transmit failed: 0x%x\n", ret);
+        // print buffer for debugging (may be unchanged)
+        printf("spi rbuf (on error):");
+        for (int i = 0; i < len && i < (int)sizeof(rbuf); i++) printf(" %02X", rbuf[i]);
+        printf("\n");
+        return 0;
+    }
 
-    // printf("version: 0x%x\n", rbuf[4]);
+    printf("spi rbuf:");
+    for (int i = 0; i < len && i < (int)sizeof(rbuf); i++) printf(" %02X", rbuf[i]);
+    printf("\n");
+
     return rbuf[4];
 }
 

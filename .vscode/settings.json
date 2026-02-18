@@ -1,0 +1,23 @@
+{
+  "idf.openOcdConfigs": [
+    "board/esp32s3-builtin.cfg"
+  ],
+  "idf.customExtraVars": {
+    "IDF_TARGET": "esp32s3"
+  },
+  "clangd.path": "/home/cuckooshan/.espressif/tools/esp-clang/esp-18.1.2_20240912/esp-clang/bin/clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=**",
+    "--compile-commands-dir=/home/cuckooshan/Projects/esxp1302_on_esp32s3/build"
+  ],
+  "idf.espIdfPath": "/home/cuckooshan/esp/v5.4.3/esp-idf",
+  "idf.toolsPath": "/home/cuckooshan/.espressif",
+  "idf.pythonInstallPath": "/usr/bin/python3",
+  "idf.flashType": "UART",
+  "idf.port": "/dev/ttyACM0",
+
+  "C_Cpp.default.compilerPath": "/home/cuckooshan/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20250730/xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc",
+  "C_Cpp.default.intelliSenseMode": "gcc-x64"
+
+}
