@@ -18,6 +18,7 @@
   "idf.port": "/dev/ttyACM0",
 
   "C_Cpp.default.compilerPath": "/home/cuckooshan/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20250730/xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc",
-  "C_Cpp.default.intelliSenseMode": "gcc-x64"
+  "C_Cpp.default.intelliSenseMode": "gcc-x64",
+  "idf.currentSetup": "/home/cuckooshan/esp/v5.4.3/esp-idf"
 
 }
