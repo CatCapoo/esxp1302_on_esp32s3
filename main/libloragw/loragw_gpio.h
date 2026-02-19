@@ -23,7 +23,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #endif
 
 #ifndef SX1302_POWER_EN_PIN
-#define SX1302_POWER_EN_PIN       GPIO_NUM_NC
+#define SX1302_POWER_EN_PIN       -1  /* not connected; use integer literal (not GPIO_NUM_NC enum) so #if works */
 #endif
 
 // #define SX1302_GPIO_PIN_SEL       ((1 << SX1302_RESET_PIN) | (1 << SX1302_POWER_EN_PIN))
