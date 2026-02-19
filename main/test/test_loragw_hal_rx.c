@@ -21,6 +21,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #endif
 
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -211,9 +212,7 @@ int test_hal_rx_main(void)
                 wait_ms(10);
             } else {
                 for (i = 0; i < nb_pkt; i++) {
-                    if (rxpkt[i].status == STAT_CRC_OK) {
-                        nb_pkt_crc_ok += 1;
-                    }
+                    nb_pkt_crc_ok += 1; /* count all packets regardless of CRC status */
                     printf("\n----- %s packet -----\n", (rxpkt[i].modulation == MOD_LORA) ? "LoRa" : "FSK");
                     printf("  count_us: %u\n", rxpkt[i].count_us);
                     printf("  size:     %u\n", rxpkt[i].size);
@@ -236,7 +235,7 @@ int test_hal_rx_main(void)
             }
         }
 
-        printf( "\nNb valid packets received: %lu CRC OK (%lu)\n", nb_pkt_crc_ok, cnt_loop );
+        printf( "\nNb packets received: %lu (CRC ignored) (%lu loops)\n", nb_pkt_crc_ok, cnt_loop );
 
         /* Stop the gateway */
         x = lgw_stop();
@@ -297,7 +296,7 @@ static int do_hal_config_cmd(int argc, char **argv)
         else if(val == 1250)
             radio_type = LGW_RADIO_TYPE_SX1250;
         else {
-            printf("'-r' with wrong value: %d; should be 1255/1257/1250\n", val);
+            printf("'-r' with wrong value: %" PRIu32 "; should be 1255/1257/1250\n", val);
             return -1;
         }
     }
@@ -306,7 +305,7 @@ static int do_hal_config_cmd(int argc, char **argv)
     if (hal_conf_args.clock_source->count > 0) {
         val = (uint32_t)hal_conf_args.clock_source->ival[0];
         if(val > 1){
-            printf("'-k' with wrong value: %d; should be 0 or 1\n", val);
+            printf("'-k' with wrong value: %" PRIu32 "; should be 0 or 1\n", val);
             return -1;
         }
         clocksource = val;
@@ -344,7 +343,7 @@ static int do_hal_config_cmd(int argc, char **argv)
     if (hal_conf_args.freq_plan_mode->count > 0) {
         val = (uint32_t)hal_conf_args.freq_plan_mode->ival[0];
         if(val > 1){
-            printf("'-m' with wrong value: %d; should be 0 or 1\n", val);
+            printf("'-m' with wrong value: %" PRIu32 "; should be 0 or 1\n", val);
             return -1;
         }
         channel_mode = val;
@@ -388,7 +387,7 @@ static void register_config(void)
 
 void app_main(void)
 {
-
+    esp_console_repl_t *repl = NULL;
     esp_console_repl_config_t repl_config = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
     repl_config.task_stack_size = 4096 * 16;
     repl_config.prompt = "sx1302_hal>";
@@ -397,7 +396,8 @@ void app_main(void)
     register_config();
 
     // initialize console REPL environment
-    ESP_ERROR_CHECK(esp_console_repl_init(&repl_config));
+    esp_console_dev_uart_config_t uart_config = ESP_CONSOLE_DEV_UART_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_console_new_repl_uart(&uart_config, &repl_config, &repl));
     // start console REPL
-    ESP_ERROR_CHECK(esp_console_repl_start());
+    ESP_ERROR_CHECK(esp_console_start_repl(repl));
 }
