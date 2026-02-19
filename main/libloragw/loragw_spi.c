@@ -375,7 +375,6 @@ int radio_spi_rb(spi_device_handle_t *spi, uint8_t spi_mux_target, uint8_t op_co
     esp_err_t err;
     spi_transaction_ext_t et;
     int cmd_size = 3; /* header + op_code + 1 */
-    uint8_t tbuf[LGW_BURST_CHUNK] = {0x00};
 
     if(cmd_size + size > LGW_BURST_CHUNK) {
         DEBUG_PRINTF("size (%d) > LGW_BURST_CHUNK - %d, which is too big!\n", size, cmd_size);
@@ -388,11 +387,11 @@ int radio_spi_rb(spi_device_handle_t *spi, uint8_t spi_mux_target, uint8_t op_co
 
     memset(&et, 0, sizeof(et));
     et.command_bits = 8;
-    et.address_bits = 8 * 2;
+    et.address_bits = 8;
     et.base.cmd = spi_mux_target;
-    et.base.addr = ((READ_ACCESS | (op_code & ADDR_MASK)) << 8) | 0x00;
+    et.base.addr = READ_ACCESS | (op_code & ADDR_MASK);
     et.base.flags = SPI_TRANS_VARIABLE_CMD | SPI_TRANS_VARIABLE_ADDR;
-    et.base.tx_buffer = tbuf;
+    et.base.tx_buffer = (unsigned long *)data;  /* send addr/NOP bytes (e.g. for READ_REGISTER) */
 
     et.base.rx_buffer = (unsigned long *)data;
     et.base.length = size * 8;
