@@ -13,12 +13,15 @@
   ],
   "idf.espIdfPath": "/home/cuckooshan/esp/v5.4.3/esp-idf",
   "idf.toolsPath": "/home/cuckooshan/.espressif",
-  "idf.pythonInstallPath": "/usr/bin/python3",
+  "idf.pythonInstallPath": "C:\\Espressif\\tools\\idf-python\\3.11.2\\python.exe",
   "idf.flashType": "UART",
   "idf.port": "/dev/ttyACM0",
 
   "C_Cpp.default.compilerPath": "/home/cuckooshan/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20250730/xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc",
   "C_Cpp.default.intelliSenseMode": "gcc-x64",
-  "idf.currentSetup": "/home/cuckooshan/esp/v5.4.3/esp-idf"
+  "idf.currentSetup": "/home/cuckooshan/esp/v5.4.3/esp-idf",
+  "idf.espIdfPathWin": "c:\\Espressif\\frameworks\\v5.4.3\\esp-idf\\v5.4.3\\esp-idf",
+  "idf.toolsPathWin": "C:\\Espressif",
+  "idf.portWin": "COM14"
 
 }

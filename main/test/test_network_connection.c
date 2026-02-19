@@ -133,8 +133,8 @@ void wifi_init_sta(void)
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
     }
 
-    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, instance_any_id));
-    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, instance_got_ip));
+    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, instance_got_ip));
+    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, instance_any_id));
     vEventGroupDelete(s_wifi_event_group);
 }
 
@@ -161,7 +161,7 @@ static void udp_client_task(void *pvParameters)
             ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
             break;
         }
-        ESP_LOGI(TAG, "Socket created, sending to %s:%d", udp_host, udp_port);
+        ESP_LOGI(TAG, "Socket created, sending to %s:%" PRIu32, udp_host, udp_port);
 
         while (1) {
             err = sendto(sock, udp_msg, strlen(udp_msg), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
@@ -214,7 +214,7 @@ void test_network_connection(void)
     wifi_init_sta();
 
     // TODO: deal with Wifi broken
-    xTaskCreate(udp_client_task, "udp_client", 4096, NULL, 5, NULL, 0);
+    xTaskCreate(udp_client_task, "udp_client", 4096, NULL, 5, NULL);
 }
 
 
@@ -320,6 +320,7 @@ static void register_config(void)
 
 void app_main(void)
 {
+    esp_console_repl_t *repl = NULL;
     esp_console_repl_config_t repl_config = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
     repl_config.task_stack_size = 4096 * 16;
     repl_config.prompt = "sx1302_hal>";
@@ -328,7 +329,8 @@ void app_main(void)
     register_config();
 
     // initialize console REPL environment
-    ESP_ERROR_CHECK(esp_console_repl_init(&repl_config));
+    esp_console_dev_uart_config_t uart_config = ESP_CONSOLE_DEV_UART_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_console_new_repl_uart(&uart_config, &repl_config, &repl));
     // start console REPL
-    ESP_ERROR_CHECK(esp_console_repl_start());
+    ESP_ERROR_CHECK(esp_console_start_repl(repl));
 }
