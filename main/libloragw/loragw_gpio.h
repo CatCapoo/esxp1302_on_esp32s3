@@ -29,10 +29,10 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 // #define SX1302_GPIO_PIN_SEL       ((1 << SX1302_RESET_PIN) | (1 << SX1302_POWER_EN_PIN))
 #if SX1302_POWER_EN_PIN >= 0
 #define SX1302_GPIO_PIN_SEL \
-    ((1 << SX1302_RESET_PIN) | (1 << SX1302_POWER_EN_PIN))
+    ((1ULL << SX1302_RESET_PIN) | (1ULL << SX1302_POWER_EN_PIN))
 #else
 #define SX1302_GPIO_PIN_SEL \
-    (1 << SX1302_RESET_PIN)
+    (1ULL << SX1302_RESET_PIN)
 #endif
 
 
