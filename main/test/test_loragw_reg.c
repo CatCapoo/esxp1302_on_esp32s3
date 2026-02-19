@@ -25,6 +25,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #include "loragw_spi.h"
 #include "loragw_reg.h"
 #include "loragw_com.h"
+#include "loragw_gpio.h"
 
 
 extern const struct lgw_reg_s loregs[LGW_TOTALREGS+1];
@@ -45,7 +46,7 @@ void app_main(void)
     }
     printf("\n!!! Note !!!\nPlease Reset SX1302 board first to run this test.\n");
     printf("You can just power off then power on the whole system\n\n");
-
+    lgw_reset();
     for(int i = 5; i > 0; i--){
         printf("waiting %d...\n", i);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
