@@ -31,6 +31,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #include "driver/gpio.h"
 
 #include "config.h"
+#include "board_config.h"
 
 
 #define UART_NUM       UART_NUM_1

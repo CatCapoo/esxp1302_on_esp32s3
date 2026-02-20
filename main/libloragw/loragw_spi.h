@@ -23,6 +23,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 
 #include "driver/spi_master.h"
 #include "config.h"    /* library configuration options (dynamically generated) */
+#include "board_config.h"
 
 
 #define LGW_SPI_SUCCESS     0
