@@ -6,3 +6,4 @@
 | [BUG-002](BUG-002_radio_spi_rb_wrong_frame_format.md) | 2026-02-19 | `main/libloragw/loragw_spi.c` | `radio_spi_rb` SPI 帧 address_bits 多1字节且 tx_buffer 全零，导致 SX1250 寄存器回读全零 | 功能性错误 |
 | [BUG-003](BUG-003_test_loragw_hal_rx_compile_errors.md) | 2026-02-19 | `main/test/test_loragw_hal_rx.c` | 格式符类型不匹配（`%d` vs `uint32_t`）、esp_console REPL API废弃 | 编译失败 |
 | [BUG-004](BUG-004_gpio_pin_mask_error_enum_in_preprocessor.md) | 2026-02-19 | `main/libloragw/loragw_gpio.h` | `SX1302_POWER_EN_PIN` 默认值为枚举 `GPIO_NUM_NC`，预处理器 `#if` 无法识别枚举值将其当 `0` 处理，导致 `pin_bit_mask` 含无效位，`gpio_config()` 报 GPIO_PIN mask error | 功能性错误 |
+| [BUG-005](BUG-005_test_loragw_cal_compile_errors_and_invalid_for_sx1250.md) | 2026-02-20 | `main/test/test_loragw_cal.c` | 函数名变更（`lgw_sx125x_reg_w/r`→`sx125x_reg_w/r`）、格式符类型不匹配、`lgw_connect` 参数不足、FreeRTOS 头文件缺失；另：该测试仅适用于 SX1255/SX1257，在 SX1250 平台上测试结果完全无效 | 编译失败 + 功能性无效 |
