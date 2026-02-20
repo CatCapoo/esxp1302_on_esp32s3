@@ -3,3 +3,5 @@ main/cscope.*
 # sdkconfig.*
 main/packet_forwarder/global_json.h
 main/packet_forwarder/webpage.h
+.cache/
+**/__pycache__/

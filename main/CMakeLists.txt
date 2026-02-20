@@ -125,8 +125,5 @@ idf_component_register(SRCS
     "${libloragw_test_src}"
     "${pkt_fwd_src}"
     "${main_src}"
-    INCLUDE_DIRS "libloragw"
-    INCLUDE_DIRS "libtools"
-    INCLUDE_DIRS "libloragw-test"
-    INCLUDE_DIRS "packet_forwarder"
+    INCLUDE_DIRS "." "libloragw" "libtools" "libloragw-test" "packet_forwarder"
 )
