@@ -42,6 +42,8 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #define WRITE_ACCESS    0x8000
 #define ADDR_MASK       0x7fff
 
+#include "board_config.h"
+
 #ifndef PIN_NUM_MISO
 #define PIN_NUM_MISO 13
 #endif

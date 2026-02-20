@@ -80,6 +80,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 
 #include "global_json.h"
 #include "driver/gpio.h"
+#include "board_config.h"
 
 #include "http_server.h"
 #include "led_indication.h"
@@ -149,11 +150,11 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 
 /* for buttons on the bottom board */
 #ifndef USER_BUTTON_1
-#define USER_BUTTON_1    23
+#define USER_BUTTON_1    0   /* IO0: user button */
 #endif
 
 #ifndef USER_BUTTON_2
-#define USER_BUTTON_2    25
+#define USER_BUTTON_2    6   /* IO6: reserved, no hardware connected */
 #endif
 
 #define BUTTON_PRESSED    0
@@ -175,7 +176,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 
 /* for display info on screen */
 #ifndef BLINK_GPIO
-#define BLINK_GPIO      2
+#define BLINK_GPIO      1   /* IO1: heartbeat LED */
 #endif
 
 #define TIME_REFRESH    5  // display the time on screen every 5s
@@ -4338,15 +4339,19 @@ void app_main(void)
     sprintf(out_info,   "            (v%s)", EXSP1302_VERSION);
     oled_show_one_line(0, 2, out_info, 1);
 
-    gpio_set_direction(USER_BUTTON_1, GPIO_MODE_INPUT);
-    gpio_set_direction(USER_BUTTON_2, GPIO_MODE_INPUT);
-
-    if(BUTTON_PRESSED == 0){
-        gpio_pullup_en(USER_BUTTON_1);
-        gpio_pullup_en(USER_BUTTON_2);
-    } else {
-        gpio_pulldown_en(USER_BUTTON_1);
-        gpio_pulldown_en(USER_BUTTON_2);
+    if(USER_BUTTON_1 != GPIO_NUM_NC){
+        gpio_set_direction(USER_BUTTON_1, GPIO_MODE_INPUT);
+        if(BUTTON_PRESSED == 0)
+            gpio_pullup_en(USER_BUTTON_1);
+        else
+            gpio_pulldown_en(USER_BUTTON_1);
+    }
+    if(USER_BUTTON_2 != GPIO_NUM_NC){
+        gpio_set_direction(USER_BUTTON_2, GPIO_MODE_INPUT);
+        if(BUTTON_PRESSED == 0)
+            gpio_pullup_en(USER_BUTTON_2);
+        else
+            gpio_pulldown_en(USER_BUTTON_2);
     }
 
     read_config_from_nvs();

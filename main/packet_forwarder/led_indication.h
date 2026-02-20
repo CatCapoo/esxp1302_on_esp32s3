@@ -17,13 +17,14 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #include "freertos/semphr.h"
 #include <stdint.h>
 #include "driver/gpio.h"
+#include "board_config.h"
 
 #ifndef LED_BLUE_GPIO
 #define LED_BLUE_GPIO   33
 #endif
 
 #ifndef LED_GREEN_GPIO
-#define LED_GREEN_GPIO  26
+#define LED_GREEN_GPIO  7   /* IO7: reserved, no hardware connected */
 #endif
 
 #ifndef LED_RED_GPIO
