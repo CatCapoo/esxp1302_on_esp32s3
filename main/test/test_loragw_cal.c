@@ -31,12 +31,16 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #include <math.h>
 #include <sys/time.h>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
 #include "loragw_hal.h"
 #include "loragw_reg.h"
 #include "loragw_sx1302.h"
 #include "loragw_sx125x.h"
 #include "loragw_aux.h"
 #include "loragw_cal.h"
+#include "loragw_com.h"
 
 /* -------------------------------------------------------------------------- */
 /* --- PRIVATE MACROS ------------------------------------------------------- */
@@ -132,32 +136,32 @@ int setup_tx_dc_offset(uint8_t rf_chain, uint32_t freq_hz, uint8_t dac_gain, uin
             DEBUG_PRINTF("ERROR: UNEXPECTED VALUE %d FOR RADIO TYPE\n", radio_type);
             return LGW_HAL_ERROR;
     }
-    lgw_sx125x_reg_w(SX125x_REG_FRF_RX_MSB, 0xFF & rx_freq_int, rf_chain);
-    lgw_sx125x_reg_w(SX125x_REG_FRF_RX_MID, 0xFF & (rx_freq_frac >> 8), rf_chain);
-    lgw_sx125x_reg_w(SX125x_REG_FRF_RX_LSB, 0xFF & rx_freq_frac, rf_chain);
-    lgw_sx125x_reg_w(SX125x_REG_FRF_TX_MSB, 0xFF & tx_freq_int, rf_chain);
-    lgw_sx125x_reg_w(SX125x_REG_FRF_TX_MID, 0xFF & (tx_freq_frac >> 8), rf_chain);
-    lgw_sx125x_reg_w(SX125x_REG_FRF_TX_LSB, 0xFF & tx_freq_frac, rf_chain);
+    sx125x_reg_w(SX125x_REG_FRF_RX_MSB, 0xFF & rx_freq_int, rf_chain);
+    sx125x_reg_w(SX125x_REG_FRF_RX_MID, 0xFF & (rx_freq_frac >> 8), rf_chain);
+    sx125x_reg_w(SX125x_REG_FRF_RX_LSB, 0xFF & rx_freq_frac, rf_chain);
+    sx125x_reg_w(SX125x_REG_FRF_TX_MSB, 0xFF & tx_freq_int, rf_chain);
+    sx125x_reg_w(SX125x_REG_FRF_TX_MID, 0xFF & (tx_freq_frac >> 8), rf_chain);
+    sx125x_reg_w(SX125x_REG_FRF_TX_LSB, 0xFF & tx_freq_frac, rf_chain);
 
     /* Radio settings for calibration */
     //lgw_sx125x_reg_w(SX125x_RX_ANA_GAIN__LNA_ZIN, 1, rf_chain); /* Default: 1 */
     //lgw_sx125x_reg_w(SX125x_RX_ANA_GAIN__BB_GAIN, 15, rf_chain); /* Default: 15 */
     //lgw_sx125x_reg_w(SX125x_RX_ANA_GAIN__LNA_GAIN, 1, rf_chain); /* Default: 1 */
-    lgw_sx125x_reg_w(SX125x_REG_RX_BW__BB_BW, 0, rf_chain);
-    lgw_sx125x_reg_w(SX125x_REG_RX_BW__ADC_TRIM, 6, rf_chain);
-    //lgw_sx125x_reg_w(SX125x_RX_BW__ADC_BW, 7, rf_chain);  /* Default: 7 */
-    lgw_sx125x_reg_w(SX125x_REG_RX_PLL_BW__PLL_BW, 0, rf_chain);
-    lgw_sx125x_reg_w(SX125x_REG_TX_BW__PLL_BW, 0, rf_chain);
-    //lgw_sx125x_reg_w(SX125x_TX_BW__ANA_BW, 0, rf_chain); /* Default: 0 */
-    lgw_sx125x_reg_w(SX125x_REG_TX_DAC_BW, 5, rf_chain);
-    lgw_sx125x_reg_w(SX125x_REG_CLK_SELECT__DAC_CLK_SELECT, 1, rf_chain); /* Use external clock from SX1302 */
-    lgw_sx125x_reg_w(SX125x_REG_TX_GAIN__DAC_GAIN, dac_gain, rf_chain);
-    lgw_sx125x_reg_w(SX125x_REG_TX_GAIN__MIX_GAIN, mix_gain, rf_chain);
-    lgw_sx125x_reg_w(SX125x_REG_CLK_SELECT__RF_LOOPBACK_EN, 1, rf_chain);
-    lgw_sx125x_reg_w(SX125x_REG_MODE, 15, rf_chain);
+    sx125x_reg_w(SX125x_REG_RX_BW__BB_BW, 0, rf_chain);
+    sx125x_reg_w(SX125x_REG_RX_BW__ADC_TRIM, 6, rf_chain);
+    //sx125x_reg_w(SX125x_RX_BW__ADC_BW, 7, rf_chain);  /* Default: 7 */
+    sx125x_reg_w(SX125x_REG_RX_PLL_BW__PLL_BW, 0, rf_chain);
+    sx125x_reg_w(SX125x_REG_TX_BW__PLL_BW, 0, rf_chain);
+    //sx125x_reg_w(SX125x_TX_BW__ANA_BW, 0, rf_chain); /* Default: 0 */
+    sx125x_reg_w(SX125x_REG_TX_DAC_BW, 5, rf_chain);
+    sx125x_reg_w(SX125x_REG_CLK_SELECT__DAC_CLK_SELECT, 1, rf_chain); /* Use external clock from SX1302 */
+    sx125x_reg_w(SX125x_REG_TX_GAIN__DAC_GAIN, dac_gain, rf_chain);
+    sx125x_reg_w(SX125x_REG_TX_GAIN__MIX_GAIN, mix_gain, rf_chain);
+    sx125x_reg_w(SX125x_REG_CLK_SELECT__RF_LOOPBACK_EN, 1, rf_chain);
+    sx125x_reg_w(SX125x_REG_MODE, 15, rf_chain);
     wait_ms(1);
-    lgw_sx125x_reg_r(SX125x_REG_MODE_STATUS__RX_PLL_LOCKED, &rx_pll_locked, rf_chain);
-    lgw_sx125x_reg_r(SX125x_REG_MODE_STATUS__TX_PLL_LOCKED, &tx_pll_locked, rf_chain);
+    sx125x_reg_r(SX125x_REG_MODE_STATUS__RX_PLL_LOCKED, &rx_pll_locked, rf_chain);
+    sx125x_reg_r(SX125x_REG_MODE_STATUS__TX_PLL_LOCKED, &tx_pll_locked, rf_chain);
     if ((rx_pll_locked == 0) || (tx_pll_locked == 0)) {
         DEBUG_MSG("ERROR: PLL failed to lock\n");
         return LGW_HAL_ERROR;
@@ -311,7 +315,7 @@ int cal_tx_dc_offset(uint8_t test_id, uint8_t rf_chain, uint32_t freq_hz, uint8_
     }
 
     if (full_log == true) {
-        printf("i_offset:%d q_offset:%d f_offset:%d dac_gain:%d mix_gain:%d dec_gain:%d amp:%u phi:%u => ", i_offset, q_offset, f_offset, dac_gain, mix_gain, CAL_DEC_GAIN, amp, phi);
+        printf("i_offset:%ld q_offset:%ld f_offset:%ld dac_gain:%d mix_gain:%d dec_gain:%d amp:%u phi:%u => ", (long)i_offset, (long)q_offset, (long)f_offset, dac_gain, mix_gain, CAL_DEC_GAIN, amp, phi);
     } else {
         switch (test_id) {
             case TEST_FREQ_SCAN:
@@ -350,7 +354,7 @@ int cal_tx_dc_offset(uint8_t test_id, uint8_t rf_chain, uint32_t freq_hz, uint8_
     val_std = sqrt(acc2/loop_len);
 
     if (full_log == true) {
-        printf(" min:%u max:%u mean:%u std:%f\n", val_min, val_max, val_mean, val_std);
+        printf(" min:%ld max:%ld mean:%ld std:%f\n", (long)val_min, (long)val_max, (long)val_mean, val_std);
     } else {
         switch (test_id) {
             case TEST_OFFSET_IQ:
@@ -442,10 +446,8 @@ int test_capture_ram(uint8_t rf_chain) {
 
 int main_test(void)
 {
-    int i, x;
+    int x;
     uint32_t ft = DEFAULT_FREQ_HZ;
-    double arg_d = 0.0;
-    unsigned int arg_u;
     uint8_t clocksource = 0;
     uint8_t rf_chain = 0;
     lgw_radio_type_t radio_type = LGW_RADIO_TYPE_NONE;
@@ -522,7 +524,7 @@ int main_test(void)
     //fp = fopen("log.txt", "w+");
 
     /* connect the gateway */
-    x = lgw_connect();
+    x = lgw_connect(LGW_COM_SPI, "spi");
     if (x != 0) {
         printf("ERROR: failed to connect the gateway\n");
         return EXIT_FAILURE;
