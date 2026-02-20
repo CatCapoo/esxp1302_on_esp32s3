@@ -24,6 +24,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #endif
 
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,7 +50,7 @@ void app_main(void)
     int i, x;
 
     // simple test for loragw_debug.c
-    dbg_init_gpio();
+    dbg_init_random();
 
     for(int i = 0; i < 4; i++){
         printf("waiting %d...\n", i+1);
@@ -64,7 +65,7 @@ void app_main(void)
     }
 
 
-    x = lgw_connect();
+    x = lgw_connect(LGW_COM_SPI, "spi");
     if (x != LGW_REG_SUCCESS) {
         printf("ERROR: Failed to connect to the concentrator using SPI\n");
         return;
@@ -90,14 +91,14 @@ void app_main(void)
 
     /* Set Radio in Standby mode */
     test_buff[0] = (uint8_t)STDBY_XOSC;
-    sx1250_write_command(0, SET_STANDBY, test_buff, 1);
-    sx1250_write_command(1, SET_STANDBY, test_buff, 1);
+    sx1250_reg_w(SET_STANDBY, test_buff, 1, 0);
+    sx1250_reg_w(SET_STANDBY, test_buff, 1, 1);
     wait_ms(10);
 
     test_buff[0] = 0x00;
-    sx1250_read_command(0, GET_STATUS, test_buff, 1);
+    sx1250_reg_r(GET_STATUS, test_buff, 1, 0);
     printf("Radio0: get_status: 0x%02X\n", test_buff[0]);
-    sx1250_read_command(1, GET_STATUS, test_buff, 1);
+    sx1250_reg_r(GET_STATUS, test_buff, 1, 1);
     printf("Radio1: get_status: 0x%02X\n", test_buff[0]);
 
     /* databuffer R/W stress test */
@@ -107,7 +108,8 @@ void app_main(void)
         test_buff[2] = rand() & 0xFF;
         test_buff[3] = rand() & 0xFF;
         test_val = (test_buff[0] << 24) | (test_buff[1] << 16) | (test_buff[2] << 8) | (test_buff[3] << 0);
-        sx1250_write_command(0, SET_RF_FREQUENCY, test_buff, 4);
+        sx1250_reg_w(SET_RF_FREQUENCY, test_buff, 4, 0);
+        wait_ms(1); /* wait for SX1250 register to settle */
 
         read_buff[0] = 0x08;
         read_buff[1] = 0x8B;
@@ -116,14 +118,14 @@ void app_main(void)
         read_buff[4] = 0x00;
         read_buff[5] = 0x00;
         read_buff[6] = 0x00;
-        sx1250_read_command(0, READ_REGISTER, read_buff, 7);
+        sx1250_reg_r(READ_REGISTER, read_buff, 7, 0);
         read_val = (read_buff[3] << 24) | (read_buff[4] << 16) | (read_buff[5] << 8) | (read_buff[6] << 0);
 
         printf("Cycle %i > ", cycle_number);
         if (read_val != test_val) {
             printf("error during the buffer comparison\n");
-            printf("Written value: %08X\n", test_val);
-            printf("Read value:    %08X\n", read_val);
+            printf("Written value: %08" PRIX32 "\n", test_val);
+            printf("Read value:    %08" PRIX32 "\n", read_val);
             break;
         } else {
             printf("did a %i-byte R/W on a register with no error\n", 4);

@@ -44,17 +44,35 @@ void app_main(void)
 
     printf("Beginning of test for loragw_spi.c\n");
 
+    printf("Please reset the SX1302 module now.\n");
+    printf("Waiting 5 seconds to allow manual reset sequence...\n");
+    for (int w = 1; w <= 5; ++w) {
+        printf("waiting %d...\n", w);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+
     i = lgw_spi_open(&spi);
     if (i != 0) {
         printf("ERROR: failed to open SPI device\n");
         return;
     }
 
-    lgw_spi_r(spi, LGW_SPI_MUX_TARGET_SX1302, SX1302_REG_COMMON + 6, &data);
-    printf("SX1302 version: 0x%02X\n", data);
+    int rc;
+    rc = lgw_spi_r(spi, LGW_SPI_MUX_TARGET_SX1302, SX1302_REG_COMMON + 6, &data);
+    if (rc != LGW_SPI_SUCCESS) {
+        printf("ERROR: lgw_spi_r(version) failed: %d\n", rc);
+    } else {
+        printf("SX1302 version: 0x%02X\n", data);
+    }
 
-    lgw_spi_r(spi, LGW_SPI_MUX_TARGET_SX1302, SX1302_REG_AGC_MCU + 0, &data);
-    lgw_spi_w(spi, LGW_SPI_MUX_TARGET_SX1302, SX1302_REG_AGC_MCU + 0, 0x06); /* mcu_clear, host_prog */
+    rc = lgw_spi_r(spi, LGW_SPI_MUX_TARGET_SX1302, SX1302_REG_AGC_MCU + 0, &data);
+    if (rc != LGW_SPI_SUCCESS) {
+        printf("ERROR: lgw_spi_r(AGC_MCU+0) failed: %d\n", rc);
+    }
+    rc = lgw_spi_w(spi, LGW_SPI_MUX_TARGET_SX1302, SX1302_REG_AGC_MCU + 0, 0x06); /* mcu_clear, host_prog */
+    if (rc != LGW_SPI_SUCCESS) {
+        printf("ERROR: lgw_spi_w(AGC_MCU+0) failed: %d\n", rc);
+    }
 
     /* databuffer R/W stress test */
     for(cycle_number = 0; cycle_number < 100; cycle_number++){

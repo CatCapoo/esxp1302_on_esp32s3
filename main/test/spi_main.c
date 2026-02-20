@@ -21,6 +21,11 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #include "esp_system.h"
 #include "driver/gpio.h"
 #include "loragw_spi.h"
+#include "loragw_com.h"
+
+#ifndef SX1302_REG_COMMON
+#define SX1302_REG_COMMON   0x5600
+#endif
 
 
 // get sx1302 version
@@ -37,16 +42,34 @@ uint8_t spi_get_version(spi_device_handle_t *spi)
     t.rx_buffer = rbuf;
 
     ret = spi_device_polling_transmit(*spi, &t);
-    assert(ret == ESP_OK);
+    if (ret != ESP_OK) {
+        printf("spi tx failed: %d\n", ret);
+        return 0xFF;
+    }
 
-    // printf("version: 0x%x\n", rbuf[4]);
+    printf("spi rbuf:");
+    for (int i = 0; i < 5; ++i) {
+        printf(" %02X", rbuf[i]);
+    }
+    printf("\n");
+
+    int all_ff = 1, all_00 = 1;
+    for (int i = 0; i < 5; ++i) {
+        if (rbuf[i] != 0xFF) all_ff = 0;
+        if (rbuf[i] != 0x00) all_00 = 0;
+    }
+    if (all_ff || all_00) {
+        printf("read looks invalid (all %s)\n", all_ff ? "FF" : "00");
+        return 0xFF;
+    }
+
     return rbuf[4];
 }
 
 
 void app_main(void)
 {
-    spi_device_handle_t spi;
+    spi_device_handle_t *spi = NULL;
     uint8_t version;
 
     printf("Testing ESXP1302 SPI...\n");
@@ -58,15 +81,20 @@ void app_main(void)
 
     // Get SX1302 Versioin
     lgw_spi_open(&spi);
-    version = spi_get_version(&spi);
+    version = spi_get_version(spi);
     printf("version = 0x%x\n", version);
-    lgw_spi_close(&spi);
+    {
+        uint8_t vreg = 0;
+        lgw_spi_r(spi, LGW_SPI_MUX_TARGET_SX1302, SX1302_REG_COMMON + 6, &vreg);
+        printf("REG_COMMON+6 = 0x%02X\n", vreg);
+    }
+    lgw_spi_close(spi);
 
     // test it again to check open()/close()
     lgw_spi_open(&spi);
-    version = spi_get_version(&spi);
+    version = spi_get_version(spi);
     printf("version = 0x%x\n", version);
-    lgw_spi_close(&spi);
+    lgw_spi_close(spi);
 
     while(true){
         printf("hello\n");

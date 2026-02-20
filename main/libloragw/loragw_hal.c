@@ -851,6 +851,7 @@ int lgw_start(void) {
     err = sx1302_set_gpio(0x00);
     if (err != LGW_REG_SUCCESS) {
         printf("ERROR: failed to set all GPIOs to 0\n");
+        lgw_disconnect();
         return LGW_HAL_ERROR;
     }
 
@@ -858,6 +859,7 @@ int lgw_start(void) {
     err = sx1302_radio_calibrate(&CONTEXT_RF_CHAIN[0], CONTEXT_BOARD.clksrc, &CONTEXT_TX_GAIN_LUT[0]);
     if (err != LGW_REG_SUCCESS) {
         printf("ERROR: radio calibration failed\n");
+        lgw_disconnect();
         return LGW_HAL_ERROR;
     }
 
@@ -868,6 +870,7 @@ int lgw_start(void) {
             err = sx1302_radio_reset(i, CONTEXT_RF_CHAIN[i].type);
             if (err != LGW_REG_SUCCESS) {
                 printf("ERROR: failed to reset radio %d\n", i);
+                lgw_disconnect();
                 return LGW_HAL_ERROR;
             }
 
@@ -882,10 +885,12 @@ int lgw_start(void) {
                     break;
                 default:
                     printf("ERROR: RADIO TYPE NOT SUPPORTED (RF_CHAIN %d)\n", i);
+                    lgw_disconnect();
                     return LGW_HAL_ERROR;
             }
             if (err != LGW_REG_SUCCESS) {
                 printf("ERROR: failed to setup radio %d\n", i);
+                lgw_disconnect();
                 return LGW_HAL_ERROR;
             }
 
@@ -893,6 +898,7 @@ int lgw_start(void) {
             err = sx1302_radio_set_mode(i, CONTEXT_RF_CHAIN[i].type);
             if (err != LGW_REG_SUCCESS) {
                 printf("ERROR: failed to set mode for radio %d\n", i);
+                lgw_disconnect();
                 return LGW_HAL_ERROR;
             }
         }

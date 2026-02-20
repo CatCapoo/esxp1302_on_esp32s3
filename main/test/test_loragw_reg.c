@@ -24,6 +24,8 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 
 #include "loragw_spi.h"
 #include "loragw_reg.h"
+#include "loragw_com.h"
+#include "loragw_gpio.h"
 
 
 extern const struct lgw_reg_s loregs[LGW_TOTALREGS+1];
@@ -44,13 +46,13 @@ void app_main(void)
     }
     printf("\n!!! Note !!!\nPlease Reset SX1302 board first to run this test.\n");
     printf("You can just power off then power on the whole system\n\n");
-
+    lgw_reset();
     for(int i = 5; i > 0; i--){
         printf("waiting %d...\n", i);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 
-    x = lgw_connect();
+    x = lgw_connect(LGW_COM_SPI, "spi");
     if (x != LGW_REG_SUCCESS) {
         printf("ERROR: failed to connect\n");
         return;
@@ -71,7 +73,7 @@ void app_main(void)
                 return;
             }
             if (val != loregs[i].dflt) {
-                printf("ERROR: default value for register at index %d is %d, should be %d\n", i, val, loregs[i].dflt);
+                printf("ERROR: default value for register at index %d is %ld, should be %ld\n", i, (long)val, (long)loregs[i].dflt);
                 error_found = true;
             }
         }
@@ -120,7 +122,7 @@ void app_main(void)
             }
             /* check value */
             if (val != rand_values[i]) {
-                printf("ERROR: value read from register at index %d differs from the written value (w:%u r:%d)\n", i, rand_values[i], val);
+                printf("ERROR: value read from register at index %d differs from the written value (w:%u r:%ld)\n", i, rand_values[i], (long)val);
                 error_found = true;
             } else {
                 //printf("INFO: MATCH reg %d (%u, %u)\n", i, rand_values[i], (uint8_t)val);

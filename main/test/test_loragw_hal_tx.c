@@ -106,7 +106,7 @@ int test_hal_tx_main(void)
     struct lgw_conf_rxrf_s rfconf;
     struct lgw_pkt_tx_s pkt;
     uint8_t tx_status;
-    uint32_t count_us;
+    unsigned int count_us;
 
 
     /* Initialize TX gain LUT */
@@ -115,12 +115,12 @@ int test_hal_tx_main(void)
 
     /* Summary of packet parameters */
     if (strcmp(mod, "CW") == 0) {
-        printf("Sending %i CW on %u Hz (Freq. offset %d kHz) at %i dBm\n", nb_pkt, ft, freq_offset, rf_power);
+        printf("Sending %u CW on %u Hz (Freq. offset %d kHz) at %d dBm\n", (unsigned int)nb_pkt, (unsigned int)ft, (int)freq_offset, (int)rf_power);
     }
     else if (strcmp(mod, "FSK") == 0) {
-        printf("Sending %i FSK packets on %u Hz (FDev %u kHz, Bitrate %.2f, %i bytes payload, %i symbols preamble) at %i dBm\n", nb_pkt, ft, fdev_khz, br_kbps, size, preamble, rf_power);
+        printf("Sending %u FSK packets on %u Hz (FDev %u kHz, Bitrate %.2f, %d bytes payload, %d symbols preamble) at %d dBm\n", (unsigned int)nb_pkt, (unsigned int)ft, (unsigned int)fdev_khz, br_kbps, (int)size, (int)preamble, (int)rf_power);
     } else {
-        printf("Sending %i LoRa packets on %u Hz (BW %i kHz, SF %i, CR %i, %i bytes payload, %i symbols preamble, %s header, %s polarity) at %i dBm\n", nb_pkt, ft, bw_khz, sf, 1, size, preamble, (no_header == false) ? "explicit" : "implicit", (invert_pol == false) ? "non-inverted" : "inverted", rf_power);
+        printf("Sending %u LoRa packets on %u Hz (BW %u kHz, SF %d, CR %d, %d bytes payload, %d symbols preamble, %s header, %s polarity) at %d dBm\n", (unsigned int)nb_pkt, (unsigned int)ft, (unsigned int)bw_khz, (int)sf, 1, (int)size, (int)preamble, (no_header == false) ? "explicit" : "implicit", (invert_pol == false) ? "non-inverted" : "inverted", (int)rf_power);
     }
 
     /* Configure the gateway */
@@ -355,7 +355,7 @@ static int do_hal_config_cmd(int argc, char **argv)
         else if(val == 1250)
             radio_type = LGW_RADIO_TYPE_SX1250;
         else {
-            printf("'-r' with wrong value: %d; should be 1255/1257/1250\n", val);
+            printf("'-r' with wrong value: %u; should be 1255/1257/1250\n", (unsigned int)val);
             return -1;
         }
     }
@@ -364,7 +364,7 @@ static int do_hal_config_cmd(int argc, char **argv)
     if (hal_conf_args.preamb_length->count > 0) {
         val = (uint32_t)hal_conf_args.preamb_length->ival[0];
         if(val > 65535){
-            printf("'-c' with wrong value: %d; Use -h to print help\n", val);
+            printf("'-c' with wrong value: %u; Use -h to print help\n", (unsigned int)val);
             return -1;
         }
         preamble = (uint16_t)val;
@@ -384,7 +384,7 @@ static int do_hal_config_cmd(int argc, char **argv)
     if (hal_conf_args.cw_freq_offset->count > 0) {
         ival = (int32_t)hal_conf_args.cw_freq_offset->ival[0];
         if((ival < -65) || (ival > 65)){
-            printf("'-o' with wrong value: %d; Use -h to print help\n", ival);
+            printf("'-o' with wrong value: %d; Use -h to print help\n", (int)ival);
             return -1;
         }
         freq_offset = ival;
@@ -394,7 +394,7 @@ static int do_hal_config_cmd(int argc, char **argv)
     if (hal_conf_args.freq_deviation->count > 0) {
         ival = (int32_t)hal_conf_args.freq_deviation->ival[0];
         if((ival < 1) || (ival > 250)){
-            printf("'-d' with wrong value: %d; Use -h to print help\n", ival);
+            printf("'-d' with wrong value: %d; Use -h to print help\n", (int)ival);
             return -1;
         }
         fdev_khz = (uint8_t)ival;
@@ -421,7 +421,7 @@ static int do_hal_config_cmd(int argc, char **argv)
     if (hal_conf_args.clock_source->count > 0) {
         val = (uint32_t)hal_conf_args.clock_source->ival[0];
         if(val > 1){
-            printf("'-k' with wrong value: %d; should be 0 or 1\n", val);
+            printf("'-k' with wrong value: %u; should be 0 or 1\n", (unsigned int)val);
             return -1;
         }
         clocksource = (uint8_t)val;
@@ -431,7 +431,7 @@ static int do_hal_config_cmd(int argc, char **argv)
     if (hal_conf_args.rf_chain->count > 0) {
         val = (uint32_t)hal_conf_args.rf_chain->ival[0];
         if(val > 1){
-            printf("'-c' with wrong value: %d; should be 0 or 1\n", val);
+            printf("'-c' with wrong value: %u; should be 0 or 1\n", (unsigned int)val);
             return -1;
         }
         rf_chain = (uint8_t)val;
@@ -447,7 +447,7 @@ static int do_hal_config_cmd(int argc, char **argv)
     if (hal_conf_args.lora_datarate->count > 0) {
         val = (uint32_t)hal_conf_args.lora_datarate->ival[0];
         if((val < 5) || (val > 12)){
-            printf("'-s' with wrong value: %d; Use -h to print help\n", val);
+            printf("'-s' with wrong value: %u; Use -h to print help\n", (unsigned int)val);
             return -1;
         }
         sf = (uint8_t)val;
@@ -457,7 +457,7 @@ static int do_hal_config_cmd(int argc, char **argv)
     if (hal_conf_args.lora_bandwidth->count > 0) {
         val = (uint32_t)hal_conf_args.lora_bandwidth->ival[0];
         if((val != 125) && (val != 250) && (val != 500)){
-            printf("'-b' with wrong value: %d; Use -h to print help\n", val);
+            printf("'-b' with wrong value: %u; Use -h to print help\n", (unsigned int)val);
             return -1;
         }
         bw_khz = (uint16_t)val;
@@ -481,7 +481,7 @@ static int do_hal_config_cmd(int argc, char **argv)
     if (hal_conf_args.packet_size->count > 0) {
         val = (uint32_t)hal_conf_args.packet_size->ival[0];
         if((val < 9) || (val > 255)){
-            printf("'-z' with wrong value: %d; Use -h to print help\n", val);
+            printf("'-z' with wrong value: %u; Use -h to print help\n", (unsigned int)val);
             return -1;
         }
         size = (uint8_t)val;
@@ -491,7 +491,7 @@ static int do_hal_config_cmd(int argc, char **argv)
     if (hal_conf_args.pa_gain->count > 0) {
         val = (uint32_t)hal_conf_args.pa_gain->ival[0];
         if(val > 3){
-            printf("'--pa' with wrong value: %d; Use -h to print help\n", val);
+            printf("'--pa' with wrong value: %u; Use -h to print help\n", (unsigned int)val);
             return -1;
         }
         txlut.size = 1;
@@ -502,7 +502,7 @@ static int do_hal_config_cmd(int argc, char **argv)
     if (hal_conf_args.dac_gain->count > 0) {
         val = (uint32_t)hal_conf_args.dac_gain->ival[0];
         if(val > 3){
-            printf("'--dac' with wrong value: %d; Use -h to print help\n", val);
+            printf("'--dac' with wrong value: %u; Use -h to print help\n", (unsigned int)val);
             return -1;
         }
         txlut.size = 1;
@@ -513,7 +513,7 @@ static int do_hal_config_cmd(int argc, char **argv)
     if (hal_conf_args.mix_gain->count > 0) {
         val = (uint32_t)hal_conf_args.mix_gain->ival[0];
         if(val > 15){
-            printf("'--mix' with wrong value: %d; Use -h to print help\n", val);
+            printf("'--mix' with wrong value: %u; Use -h to print help\n", (unsigned int)val);
             return -1;
         }
         txlut.size = 1;
@@ -524,7 +524,7 @@ static int do_hal_config_cmd(int argc, char **argv)
     if (hal_conf_args.dig_gain->count > 0) {
         val = (uint32_t)hal_conf_args.dig_gain->ival[0];
         if(val > 3){
-            printf("'--mix' with wrong value: %d; Use -h to print help\n", val);
+            printf("'--dig' with wrong value: %u; Use -h to print help\n", (unsigned int)val);
             return -1;
         }
         txlut.size = 1;
@@ -535,7 +535,7 @@ static int do_hal_config_cmd(int argc, char **argv)
     if (hal_conf_args.pow_index->count > 0) {
         val = (uint32_t)hal_conf_args.pow_index->ival[0];
         if(val > 22){
-            printf("'--pwid' with wrong value: %d; Use -h to print help\n", val);
+            printf("'--pwid' with wrong value: %u; Use -h to print help\n", (unsigned int)val);
             return -1;
         }
         txlut.size = 1;
@@ -612,8 +612,9 @@ void app_main(void)
     usage();
     register_config();
 
-    // initialize console REPL environment
-    ESP_ERROR_CHECK(esp_console_repl_init(&repl_config));
-    // start console REPL
-    ESP_ERROR_CHECK(esp_console_repl_start());
+    // initialize and start console REPL (IDF 5.x API)
+    esp_console_repl_t *repl = NULL;
+    esp_console_dev_uart_config_t uart_config = ESP_CONSOLE_DEV_UART_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_console_new_repl_uart(&uart_config, &repl_config, &repl));
+    ESP_ERROR_CHECK(esp_console_start_repl(repl));
 }
