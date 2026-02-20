@@ -115,7 +115,7 @@ int test_hal_rx_main(void)
 
     /* Configure the gateway */
     memset( &boardconf, 0, sizeof boardconf);
-    boardconf.lorawan_public = true;
+    boardconf.lorawan_public = false;
     boardconf.clksrc = clocksource;
     boardconf.full_duplex = false;
     if (lgw_board_setconf(&boardconf) != LGW_HAL_SUCCESS) {
