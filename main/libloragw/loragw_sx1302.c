@@ -1221,14 +1221,23 @@ int sx1302_agc_status(uint8_t* status) {
 
 int sx1302_agc_wait_status(uint8_t status) {
     uint8_t val;
+    int timeout = 2000; /* 2000 * 1ms = 2s timeout */
 
+    printf("DEBUG AGC: waiting for status 0x%02X...\n", status);
     do {
         if (sx1302_agc_status(&val) != LGW_REG_SUCCESS) {
             return LGW_REG_ERROR;
         }
-        /* TODO: add timeout */
+        if (--timeout <= 0) {
+            printf("ERROR: AGC wait_status TIMEOUT waiting for 0x%02X, current=0x%02X\n", status, val);
+            return LGW_REG_ERROR;
+        }
+        if (val != status) {
+            wait_ms(1);
+        }
     } while (val != status);
 
+    printf("DEBUG AGC: status 0x%02X reached OK\n", status);
     return LGW_REG_SUCCESS;
 }
 

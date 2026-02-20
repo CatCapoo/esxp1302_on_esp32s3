@@ -148,6 +148,8 @@ int sx1250_setup(uint8_t rf_chain, unsigned int freq_hz, bool single_input_mode)
     /* Get status to check Standby mode has been properly set */
     buff[0] = 0x00;
     err |= sx1250_reg_r(GET_STATUS, buff, 1, rf_chain);
+    printf("DEBUG sx1250_%u: GET_STATUS after SET_STANDBY(RC) = 0x%02X (mode bits[6:4]=0x%02X, expect 0x02)\n",
+        rf_chain, buff[0], (uint8_t)(TAKE_N_BITS_FROM(buff[0], 4, 3)));
     if ((uint8_t)(TAKE_N_BITS_FROM(buff[0], 4, 3)) != 0x02) {
         printf("ERROR: Failed to set SX1250_%u in STANDBY_RC mode\n", rf_chain);
         return LGW_REG_ERROR;
@@ -166,6 +168,8 @@ int sx1250_setup(uint8_t rf_chain, unsigned int freq_hz, bool single_input_mode)
     /* Get status to check Standby mode has been properly set */
     buff[0] = 0x00;
     err |= sx1250_reg_r(GET_STATUS, buff, 1, rf_chain);
+    printf("DEBUG sx1250_%u: GET_STATUS after SET_STANDBY(XOSC) = 0x%02X (mode bits[6:4]=0x%02X, expect 0x03)\n",
+        rf_chain, buff[0], (uint8_t)(TAKE_N_BITS_FROM(buff[0], 4, 3)));
     if ((uint8_t)(TAKE_N_BITS_FROM(buff[0], 4, 3)) != 0x03) {
         printf("ERROR: Failed to set SX1250_%u in STANDBY_XOSC mode\n", rf_chain);
         return LGW_REG_ERROR;
@@ -230,10 +234,16 @@ int sx1250_setup(uint8_t rf_chain, unsigned int freq_hz, bool single_input_mode)
     err |= sx1250_reg_w(WRITE_REGISTER, buff, 5, rf_chain);
 
     /* Set Radio in Rx mode, necessary to give a clock to SX1302 */
+    printf("DEBUG sx1250_%u: SET_RF_FREQUENCY reg=0x%08X (%.3f MHz)\n", rf_chain, (unsigned int)SX1250_FREQ_TO_REG(freq_hz), freq_hz / 1e6);
     buff[0] = 0xFF;
     buff[1] = 0xFF;
     buff[2] = 0xFF;
     err |= sx1250_reg_w(SET_RX, buff, 3, rf_chain); /* Rx Continuous */
+    wait_ms(5);
+    buff[0] = 0x00;
+    sx1250_reg_r(GET_STATUS, buff, 1, rf_chain);
+    printf("DEBUG sx1250_%u: GET_STATUS after SET_RX = 0x%02X (mode bits[6:4]=0x%02X, expect 0x05=RX)\n",
+        rf_chain, buff[0], (uint8_t)(TAKE_N_BITS_FROM(buff[0], 4, 3)));
 
     /* Select single input or differential input mode */
     if (single_input_mode == true) {
