@@ -97,7 +97,7 @@
         /* adjust the following parameters for your network */
         "keepalive_interval": 10,
         "stat_interval": 30,
-        "push_timeout_ms": 100,
+        "push_timeout_ms": 500,
         /* forward only valid packets */
         "forward_crc_valid": true,
         "forward_crc_error": false,
