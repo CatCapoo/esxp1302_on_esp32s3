@@ -106,8 +106,8 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #define DEFAULT_PORT_DW     1782
 #define DEFAULT_KEEPALIVE   5           /* default time interval for downstream keep-alive packet */
 #define DEFAULT_STAT        30          /* default time interval for statistics */
-#define PUSH_TIMEOUT_MS     100
-#define PULL_TIMEOUT_MS     200
+#define PUSH_TIMEOUT_MS     2000        /* increased from 500 to tolerate WiFi hotspot jitter */
+#define PULL_TIMEOUT_MS     1000        /* increased from 200 to tolerate WiFi hotspot jitter */
 #define GPS_REF_MAX_AGE     30          /* maximum admitted delay in seconds of GPS loss before considering latest GPS sync unusable */
 #define FETCH_SLEEP_MS      10          /* nb of ms waited when a fetch return no packets */
 #define BEACON_POLL_MS      50          /* time in ms between polling of beacon TX status */
@@ -184,6 +184,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 
 #define IP_LEN  32  // a right ip address should be no more than 16 bytes. some extra space for failed solving
 
+#define ENABLE_MQTT     0   /* set to 1 to enable MQTT, 0 to disable */
 #define MQTT_BROKER_URL "mqtt://192.168.1.202"
 #define MQTT_TOPIC "/topic/esxp1302"
 
@@ -1523,8 +1524,7 @@ static int send_tx_ack(uint8_t token_h, uint8_t token_l, enum jit_error_e error,
     buff_ack[buff_index] = 0; /* add string terminator, for safety */
 
     /* send datagram to server */
-    //return send(sock_down, (void *)buff_ack, buff_index, 0);
-    return sendto(sock_down, (void *)buff_ack, buff_index, 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+    return send(sock_down, (void *)buff_ack, buff_index, 0);
 }
 
 static int dns_loopup(char *hostname, char *ip)
@@ -1759,27 +1759,19 @@ int pkt_fwd_main(void)
 
     Init_Led(); // Initialize LED
 
-#if 0
-    /* network socket creation */
-    struct addrinfo *result; /* store result of getaddrinfo */
-    struct addrinfo *q; /* pointer to move into *result data */
-
     /* connect so we can send/receive packet with the server only */
-    i = connect(sock_up, q->ai_addr, q->ai_addrlen);
+    i = connect(sock_up, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
     if (i != 0) {
         MSG("ERROR: [up] connect returned %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
-    freeaddrinfo(result);
 
     /* connect so we can send/receive packet with the server only */
-    i = connect(sock_down, q->ai_addr, q->ai_addrlen);
+    i = connect(sock_down, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
     if (i != 0) {
         MSG("ERROR: [down] connect returned %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
-    freeaddrinfo(result);
-#endif
 
     /* set upstream socket RX timeout */
     i = setsockopt(sock_up, SOL_SOCKET, SO_RCVTIMEO, (void *)&push_timeout_half, sizeof push_timeout_half);
@@ -2638,13 +2630,25 @@ void thread_up(void)
 
         printf("\nJSON up: %s\n", (char *)(buff_up + 12)); /* DEBUG: display JSON payload */
 
+        /* drain any stale ACKs left in buffer from a previous timed-out round,
+         * then send new PUSH_DATA. Without this, an old PUSH_ACK with a stale
+         * token would arrive after the 500ms window and corrupt the next round. */
+        {
+            struct timeval drain_tv = {0, 1000}; /* 1 ms – essentially non-blocking */
+            uint8_t _tmp[4];
+            setsockopt(sock_up, SOL_SOCKET, SO_RCVTIMEO, (void *)&drain_tv, sizeof drain_tv);
+            while (recv(sock_up, (void *)_tmp, sizeof _tmp, 0) > 0) {}
+            setsockopt(sock_up, SOL_SOCKET, SO_RCVTIMEO, (void *)&push_timeout_half, sizeof push_timeout_half);
+        }
+
         /* send datagram to server */
-        //send(sock_up, (void *)buff_up, buff_index, 0);
-        sendto(sock_up, (void *)buff_up, buff_index, 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+        send(sock_up, (void *)buff_up, buff_index, 0);
 
         // send datagram to mqtt server
+#if ENABLE_MQTT
         int msg_id = esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC, (char *)(buff_up + 12), 0, 0, 0);
         ESP_LOGI(MQTT_TAG, "sent publish successful, msg_id=%d", msg_id);
+#endif
 
         clock_gettime(CLOCK_MONOTONIC, &send_time);
         xSemaphoreTake(mx_meas_up, portMAX_DELAY);
@@ -2652,10 +2656,8 @@ void thread_up(void)
         meas_up_network_byte += buff_index;
 
         /* wait for acknowledge (in 2 times, to catch extra packets) */
-        socklen_t socklen = sizeof(source_addr);
         for (i=0; i<2; ++i) {
-            //j = recv(sock_up, (void *)buff_ack, sizeof buff_ack, 0);
-            j = recvfrom(sock_up, (void *)buff_ack, sizeof buff_ack, 0, (struct sockaddr *)&dest_addr, &socklen);
+            j = recv(sock_up, (void *)buff_ack, sizeof buff_ack, 0);
             clock_gettime(CLOCK_MONOTONIC, &recv_time);
             if (j == -1) {
                 if (errno == EAGAIN) { /* timeout */
@@ -2916,8 +2918,7 @@ void thread_down(void)
         buff_req[2] = token_l;
 
         /* send PULL request and record time */
-        //send(sock_down, (void *)buff_req, sizeof buff_req, 0);
-        sendto(sock_down, (void *)buff_req, sizeof buff_req, 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+        send(sock_down, (void *)buff_req, sizeof buff_req, 0);
         clock_gettime(CLOCK_MONOTONIC, &send_time);
         xSemaphoreTake(mx_meas_dw, portMAX_DELAY);
         meas_dw_pull_sent += 1;
@@ -2927,12 +2928,10 @@ void thread_down(void)
 
         /* listen to packets and process them until a new PULL request must be sent */
         recv_time = send_time;
-        socklen_t socklen = sizeof(source_addr);
         while (((int)difftimespec(recv_time, send_time) < keepalive_time) && !exit_sig && !quit_sig) {
 
             /* try to receive a datagram */
-            //msg_len = recv(sock_down, (void *)buff_down, (sizeof buff_down)-1, 0);
-            msg_len = recvfrom(sock_down, (void *)buff_down, (sizeof buff_down)-1, 0, (struct sockaddr *)&dest_addr, &socklen);
+            msg_len = recv(sock_down, (void *)buff_down, (sizeof buff_down)-1, 0);
             clock_gettime(CLOCK_MONOTONIC, &recv_time);
 
             /* Pre-allocate beacon slots in JiT queue, to check downlink collisions */
@@ -4124,7 +4123,9 @@ static void wifi_sta_event_handler(void *arg, esp_event_base_t event_base,
             esp_sntp_init();
 
             config_wifi_mode(WIFI_MODE_STATION);
+#if ENABLE_MQTT
             xTaskCreatePinnedToCore(((TaskFunction_t) mqtt_task), "mqtt", 1*4096, NULL, 6, &mqtt_handle, 0);
+#endif
             xTaskCreatePinnedToCore(((TaskFunction_t) pkt_fwd_task), "pkt_fwd", 1*4096, NULL, 6, &pkt_fwd_handle, 0);
         }
     }
