@@ -106,8 +106,8 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #define DEFAULT_PORT_DW     1782
 #define DEFAULT_KEEPALIVE   5           /* default time interval for downstream keep-alive packet */
 #define DEFAULT_STAT        30          /* default time interval for statistics */
-#define PUSH_TIMEOUT_MS     2000        /* increased from 500 to tolerate WiFi hotspot jitter */
-#define PULL_TIMEOUT_MS     1000        /* increased from 200 to tolerate WiFi hotspot jitter */
+#define PUSH_TIMEOUT_MS     500         /* tv_usec = 500*500 = 250000 (250ms/attempt, 500ms total). ACK observed < 100ms with WIFI_PS_NONE */
+#define PULL_TIMEOUT_MS     400         /* tv_usec = 400*1000 = 400000 (400ms). PULL_ACK observed < 300ms */
 #define GPS_REF_MAX_AGE     30          /* maximum admitted delay in seconds of GPS loss before considering latest GPS sync unusable */
 #define FETCH_SLEEP_MS      10          /* nb of ms waited when a fetch return no packets */
 #define BEACON_POLL_MS      50          /* time in ms between polling of beacon TX status */
@@ -2632,13 +2632,11 @@ void thread_up(void)
 
         /* drain any stale ACKs left in buffer from a previous timed-out round,
          * then send new PUSH_DATA. Without this, an old PUSH_ACK with a stale
-         * token would arrive after the 500ms window and corrupt the next round. */
+         * token would arrive and consume one of the two recv() attempts below.
+         * Use MSG_DONTWAIT so SO_RCVTIMEO is never touched here. */
         {
-            struct timeval drain_tv = {0, 1000}; /* 1 ms – essentially non-blocking */
             uint8_t _tmp[4];
-            setsockopt(sock_up, SOL_SOCKET, SO_RCVTIMEO, (void *)&drain_tv, sizeof drain_tv);
-            while (recv(sock_up, (void *)_tmp, sizeof _tmp, 0) > 0) {}
-            setsockopt(sock_up, SOL_SOCKET, SO_RCVTIMEO, (void *)&push_timeout_half, sizeof push_timeout_half);
+            while (recv(sock_up, (void *)_tmp, sizeof _tmp, MSG_DONTWAIT) > 0) {}
         }
 
         /* send datagram to server */
@@ -2663,6 +2661,7 @@ void thread_up(void)
                 if (errno == EAGAIN) { /* timeout */
                     continue;
                 } else { /* server connection error */
+                    MSG("WARNING: [up] recv error: %s\n", strerror(errno));
                     break;
                 }
             } else if ((j < 4) || (buff_ack[0] != PROTOCOL_VERSION) || (buff_ack[3] != PKT_PUSH_ACK)) {
@@ -4168,6 +4167,12 @@ void wifi_init_sta(void)
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
     ESP_ERROR_CHECK(esp_wifi_start() );
+
+    /* Disable modem sleep so the WiFi radio stays awake and ACK/downlink UDP
+     * packets are not buffered by the AP until the next DTIM beacon.
+     * Without this, incoming UDP packets can be delayed 100-300 ms by the AP,
+     * causing recv() to time out and ackr to drop by 20-40%. */
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
     ESP_LOGI(WIFI_TAG, "wifi_init_sta finished.");
 }
