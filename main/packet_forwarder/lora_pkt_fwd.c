@@ -22,6 +22,13 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
     #define _XOPEN_SOURCE 500
 #endif
 
+/* GPS log verbosity:
+ *   0 = silent (no GPS raw output)
+ *   1 = key info only (fix status change, satellite count change, errors)
+ *   2 = full NMEA dump every cycle (for debugging wiring/baud rate)
+ */
+#define GPS_LOG_VERBOSE  1
+
 #include <stdint.h>         /* C99 types */
 #include <stdbool.h>        /* bool type */
 #include <stdio.h>          /* printf, fprintf, snprintf, fopen, fputs */
@@ -1686,19 +1693,16 @@ int pkt_fwd_main(void)
     gps_enabled = false;
     gps_ref_valid = false;
 
-#if 0
-//#ifndef GPS_DISABLE
-    i = lgw_gps_enable("ATGM336H", 0, &gps_tty_fd); /* HAL only supports atgm336h or u-blox 7 for now */
+    i = lgw_gps_enable("atgm336h", 0, (uart_port_t *)&gps_tty_fd);
     if (i != LGW_GPS_SUCCESS) {
-        printf("WARNING: [main] impossible to open %s for GPS sync (check permissions)\n", gps_tty_path);
+        printf("WARNING: [main] impossible to open GPS UART for sync (check pin wiring)\n");
         gps_enabled = false;
         gps_ref_valid = false;
     } else {
-        printf("INFO: [main] TTY port %s open for GPS synchronization\n", gps_tty_path);
-        //gps_enabled = true;
-        //gps_ref_valid = false;
+        printf("INFO: [main] GPS UART (port %d) opened for synchronization\n", gps_tty_fd);
+        gps_enabled = true;
+        gps_ref_valid = false;
     }
-#endif
 
     /* get timezone info */
     tzset();
@@ -1891,8 +1895,52 @@ int pkt_fwd_main(void)
                 ESP_ERROR_CHECK(uart_get_buffered_data_len(gps_tty_fd, (size_t *)&length));
                 min = (length < 1024) ? length : 1024;
                 length = uart_read_bytes(gps_tty_fd, data, min, 100);
-                data[min] = '\0';
-                //printf("GPS Raw Data -------> length = %d, min = %d:\n%s\n", length, min, data);
+                if (length > 0 && length < 1024) {
+                    data[length] = '\0';
+
+                    /* check if all bytes are 0x00 (BREAK / RX line held low) */
+                    bool all_zero = true;
+                    for (int gi = 0; gi < length; gi++) {
+                        if (data[gi] != 0x00) { all_zero = false; break; }
+                    }
+
+                    if (all_zero) {
+                        /* Always print wiring errors regardless of verbosity */
+                        printf("[GPS] WARN: %d bytes all 0x00 - RX line held LOW. "
+                               "Check GPS power & wiring (GPS_TX -> GPIO%d).\n",
+                               length, GPS_UART_RXD);
+                    } else {
+#if GPS_LOG_VERBOSE >= 1
+                        /* Key info: parse sat count and fix status from $GPGSV and $GNRMC */
+                        int sat_count = 0;
+                        char fix_status = 'V';
+                        char *p;
+                        /* parse $GPGSV sat count (field 3) */
+                        if ((p = strstr((char *)data, "$GPGSV,")) != NULL) {
+                            int f1, f2, f3;
+                            if (sscanf(p, "$GPGSV,%d,%d,%d", &f1, &f2, &f3) == 3)
+                                sat_count = f3;
+                        }
+                        /* parse $GNRMC fix status (field 2) */
+                        if ((p = strstr((char *)data, "$GNRMC,")) != NULL) {
+                            char tmp[8];
+                            if (sscanf(p, "$GNRMC,%*[^,],%7s", tmp) == 1)
+                                fix_status = tmp[0];
+                        }
+                        /* print every time (always show current sat count and fix status) */
+                        printf("[GPS] sats: %d  fix: %c%s\n",
+                               sat_count, fix_status,
+                               fix_status == 'A' ? "  <<< FIXED!" : "");
+#endif
+#if GPS_LOG_VERBOSE >= 2
+                        /* Full dump: hex header + full NMEA text */
+                        int show = (length < 48) ? length : 48;
+                        printf("[GPS] %d bytes hex:", length);
+                        for (int gi = 0; gi < show; gi++) printf(" %02X", data[gi]);
+                        printf("\n[GPS] ascii: %s\n", (char *)data);
+#endif
+                    }
+                }
             }
         }
         strftime(stat_timestamp, sizeof stat_timestamp, "%F %T %Z", gmtime(&t));

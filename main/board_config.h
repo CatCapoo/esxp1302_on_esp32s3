@@ -25,7 +25,7 @@
 /* ---------------------------------------------------------------
  * SX1302 control GPIO
  * --------------------------------------------------------------- */
-#define SX1302_RESET_PIN        2
+#define SX1302_RESET_PIN        10
 #define SX1302_POWER_EN_PIN    -1   /* not connected; integer literal needed for #if */
 
 /* ---------------------------------------------------------------
@@ -38,8 +38,8 @@
 /* ---------------------------------------------------------------
  * GPS UART
  * --------------------------------------------------------------- */
-#define GPS_UART_TXD  (GPIO_NUM_NC)   /* not connected */
-#define GPS_UART_RXD  (GPIO_NUM_NC)   /* not connected */
+#define GPS_UART_TXD  (GPIO_NUM_19)   /* ESP TX  -> GPS module RX */
+#define GPS_UART_RXD  (GPIO_NUM_20)   /* ESP RX  <- GPS module TX */
 
 /* ---------------------------------------------------------------
  * LEDs
