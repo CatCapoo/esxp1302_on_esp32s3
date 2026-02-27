@@ -42,7 +42,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #include "loragw_sx1261.h"
 #include "loragw_sx1302.h"
 #include "loragw_sx1302_timestamp.h"
-#include "loragw_stts751.h"
+#include "loragw_lm75a.h"
 #include "loragw_ad5338r.h"
 #include "loragw_debug.h"
 
@@ -1066,7 +1066,7 @@ int lgw_start(void) {
         /* Find the temperature sensor on the known supported ports */
         for (i = 0; i < (int)(sizeof I2C_PORT_TEMP_SENSOR); i++) {
             ts_addr = I2C_PORT_TEMP_SENSOR[i];
-            err = stts751_configure(ts_addr);
+            err = lm75a_configure(ts_addr);
             if (err != LGW_I2C_SUCCESS) {
                 printf("WARNING: failed to configure temperature sensor on port 0x%02X\n", ts_addr);
             } else {
@@ -1540,7 +1540,7 @@ int lgw_get_temperature(float* temperature) {
 
     switch (CONTEXT_COM_TYPE) {
         case LGW_COM_SPI:
-            err = stts751_get_temperature(ts_addr, temperature);
+            err = lm75a_get_temperature(ts_addr, temperature);
             break;
         case LGW_COM_USB:
             err = lgw_com_get_temperature(temperature);

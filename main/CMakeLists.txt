@@ -11,7 +11,7 @@ set(libloragw_src
     "libloragw/loragw_lbt.c"
     "libloragw/loragw_reg.c"
     "libloragw/loragw_spi.c"
-    "libloragw/loragw_stts751.c"
+    "libloragw/loragw_lm75a.c"
     "libloragw/loragw_sx1250.c"
     "libloragw/loragw_sx125x.c"
     "libloragw/loragw_sx1261.c"
