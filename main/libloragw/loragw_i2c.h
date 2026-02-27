@@ -77,6 +77,15 @@ esp_err_t i2c_esp32_read(uint8_t device_addr, uint8_t reg_addr, uint8_t *data);
 esp_err_t i2c_esp32_write(uint8_t device_addr, uint8_t reg_addr, uint8_t data);
 
 /**
+@brief Read two bytes from an I2C port (for 16-bit register reads)
+@param device_addr  I2C device address
+@param reg_addr     Address of the register to be read
+@param data         Pointer to a 2-byte buffer to store read data (MSB first)
+@return 0 if I2C data read is successful, -1 else
+*/
+esp_err_t i2c_esp32_read_word(uint8_t device_addr, uint8_t reg_addr, uint8_t *data);
+
+/**
 @brief Write a raw buffer to an I2C port
 @param device_addr  I2C device address
 @param data         byte to write in the register
