@@ -133,75 +133,216 @@ chirpstack-gateway-bridge:
 
 ---
 
-## 三、ChirpStack Web GUI 操作流程
+## 三、在 ChirpStack 中注册设备：完整流程与参数说明
+
+ChirpStack 注册一台新设备需要依次完成 4 步，后面的步骤依赖前面的步骤创建的对象：
+
+```
+① 注册网关（Gateway）
+       ↓
+② 创建设备配置文件（Device Profile）
+       ↓
+③ 创建应用（Application）
+       ↓
+④ 在应用内注册设备（Device）并填写密钥
+```
+
+---
 
 ### 3.1 注册网关（Gateway）
 
 Web UI → **Gateways** → **Add gateway**
 
-| 字段 | 值 | 说明 |
-|------|----|------|
-| Name | 随意 | 显示名称 |
-| Gateway ID | `AA555A00000021FB` | 8字节 EUI，从网关串口日志读取 |
-| Description | 随意 | |
-| Tags | 可选 | |
+#### 字段说明
 
-> 网关 EUI 在 lora_pkt_fwd.c 中通过 `esp_read_mac()` 读取 WiFi MAC 地址生成，
-> 串口日志中会打印：`Gateway EUI: AA:55:5A:00:00:00:21:FB`
+| 字段 | 示例值 | 说明 |
+|------|--------|------|
+| **Name** | `ESXP1302-Lab` | 仅用于显示，无功能影响 |
+| **Gateway ID（EUI-64）** | `AA555A00000021FB` | **关键字段**。8字节 EUI，全局唯一标识网关 |
+| Description | 随意 | 备注 |
+| Tags | 可选 | Key-Value 元数据，可用于过滤 |
 
-注册后，若 gateway-bridge 配置正确，几秒后网关状态应变为 **Online**（绿色）。
+**Gateway ID 从哪来？**  
+本工程固件在启动时通过 `esp_read_mac()` 读取 ESP32-S3 WiFi MAC 地址，
+拼接后打印到串口 Monitor：
+```
+Gateway EUI: AA:55:5A:00:00:00:21:FB
+```
+去掉冒号即为 `AA555A00000021FB`。也可在 `global_conf.cn490.json` 中的
+`gateway_ID` 字段查到。
+
+**注册后验证：**  
+几秒后刷新页面，**Last seen** 应显示当前时间（而不是 "Never"）；
+状态指示变为绿色 **Online**。若仍显示离线，检查 gateway-bridge 的
+MQTT topic 前缀是否与 NS region id 一致（见第二节）。
+
+---
 
 ### 3.2 创建设备配置文件（Device Profile）
 
-**Device Profile** 定义了一类设备的 LoRaWAN 参数，多个设备可共用：
+**Device Profile** 定义了"一类节点"的 LoRaWAN 参数，同型号的多台设备共享同一个
+Profile，不需要每台单独设置。
 
 Web UI → **Device profiles** → **Add device profile**
 
-| 字段 | 常用值 | 说明 |
-|------|--------|------|
-| Name | 随意 | 如 "CN470_10_OTAA_SF7" |
-| Region | CN470_10 | 必须与网关频率计划一致 |
-| MAC version | LoRaWAN 1.0.4 / 1.1 | 取决于节点固件 |
-| Regional parameters | RP002-1.0.3 | |
-| ADR algorithm | Default | 根据 RSSI/SNR 自动调整 SF |
-| Uplink interval | 3600 | 预期上行间隔（秒），用于判断设备是否活跃 |
+#### General 选项卡
 
-**Join 选项卡（OTA）：**
+| 字段 | 推荐值 | 说明 |
+|------|--------|------|
+| **Name** | `E77-CN470-OTAA` | 命名建议包含型号+频段+入网方式，便于区分 |
+| **Region** | `CN470_10` | **关键字段**。必须与网关 radio 频率对应的子频段一致，本工程固定选 CN470_10 |
+| **MAC version** | `LoRaWAN 1.0.3` | **关键字段**。必须与节点固件版本严格匹配。E77-400M22S 固件为 LoRaWAN 1.0.3，选错会导致 MIC 校验失败或 FCnt 逻辑不兼容 |
+| **Regional parameters revision** | `A`（即 RP002-1.0.1） | 与 MAC version 配套的区域参数版本。1.0.3 对应选 A |
+| **ADR algorithm** | `Default ADR algorithm (LoRa only)` | ChirpStack 内置 ADR 策略：收集历史 SNR 样本，自动下发 LinkADRReq 调整 DR 和 TxPower。选 Default 即可 |
+| **Expected uplink interval** | `3600`（秒） | 预期节点上行间隔，用于判断设备是否活跃（超时后 Device 状态变为 inactive）。测试时可填较小值如 `120` |
+| **Device-status request interval** | `0`（禁用）| 自动发 DevStatusReq 查电池和 SNR 的间隔，0 = 禁用。测试不需要开 |
+
+#### Join (OTAA) 选项卡
+
+| 字段 | 值 | 说明 |
+|------|----|------|
+| **Supports OTAA** | ✅ 勾选 | 表示此 Profile 的设备使用 OTAA 入网。OTAA 优于 ABP：每次入网动态派发 DevAddr 和 Session Key，防重放攻击 |
+
+#### Class B / Class C 选项卡
+
+| 字段 | 值 | 说明 |
+|------|----|------|
+| Supports Class B | 不勾 | Class B 需要网关同步 Beacon，目前未测试 |
+| Supports Class C | 不勾 | Class C 节点常开接收窗口，功耗高，需要节点固件支持。E77 入网后可通过 `AT+CCLASS=C` 切换，届时再创建单独 Profile |
+
+#### Codec 选项卡
 
 | 字段 | 说明 |
 |------|------|
-| Supports OTAA | 勾选（推荐用 OTAA，比 ABP 安全）|
+| Payload codec | 用于在 GUI 中自动解码 payload。选 `None` 则显示原始 hex；选 `CayenneLPP` 则自动解析传感器数据格式；也可填自定义 JavaScript 解码器 |
+
+> **小结**：Device Profile 描述的是节点"能做什么"（版本、Class、ADR 支持），
+> 不涉及具体的 DevEUI / AppKey，可以被多台同型号设备复用。
+
+---
 
 ### 3.3 创建应用（Application）
 
-**Application** 是设备的逻辑容器，同一应用内的设备共享数据通道：
+**Application** 是设备的逻辑分组容器。同一应用内的设备共享：
+- 同一个 MQTT uplink topic（`application/<id>/device/+/event/up`）
+- 同一套 HTTP integration / webhook 配置
+- 同一个 API 鉴权视图
 
 Web UI → **Applications** → **Add application**
 
 | 字段 | 说明 |
 |------|------|
-| Name | 如 "Test_App" |
+| **Name** | 如 `GW-Validation-Test` |
 | Description | 随意 |
+| Tags | 可选 Key-Value 元数据 |
 
-### 3.4 注册设备（Device）
+> 生产场景中一个业务系统对应一个 Application；
+> 调试场景一般一个项目建一个 Application 即可。
 
-在 Application 内注册具体设备：
+---
 
-Web UI → **Applications** → 选择应用 → **Add device**
+### 3.4 注册设备（Device）并填写密钥
 
-| 字段 | 说明 |
-|------|------|
-| Name | 随意 |
-| DevEUI | 节点固件中的 8字节设备EUI（唯一标识）|
-| Device profile | 选择上面创建的 Profile |
-| Skip frame-counter checks | 调试期间可勾选，生产环境不要勾 |
+在 Application 内为每台物理节点创建一个 Device 条目。
 
-添加设备后，进入设备详情 → **Keys (OTAA)** 标签页，填写：
+**路径：** Web UI → **Applications** → 选择应用 → **Add device**
 
-| 字段 | 说明 |
-|------|------|
-| Application key | 16字节，节点和 NS 共同持有的根密钥（AES-128）|
-| NwkKey（1.1+）| LoRaWAN 1.1 额外密钥 |
+#### General 选项卡
+
+| 字段 | 示例值 | 说明 |
+|------|--------|------|
+| **Name** | `E77-Node-01` | 显示名，随意 |
+| **DevEUI** | `AABBCCDD11223344` | **关键字段**。8字节全局唯一设备标识符，烧写在节点芯片内，通过 `AT+CDEVEUI=?` 查询 |
+| **AppEUI（JoinEUI）** | `0000000000000000` | 标识 Join Server 的 8字节 EUI。LoRaWAN 1.0.x 称 AppEUI，1.1 称 JoinEUI。自建测试全填 0 即可；生产场景由部署方分配 |
+| **Device profile** | 选择步骤 3.2 创建的 Profile | 决定 MAC 版本、Region、ADR 等 |
+| **Skip frame-counter checks** | 调试期间勾选 | **调试必勾**。不勾时若节点重烧后 FCnt 从 0 重置，NS 会因为 FCnt 回退而拒绝所有上行包（防重放保护）。生产环境不勾 |
+| Tags | 可选 | |
+| Variables | 可选 | 可在 JS codec 中引用的自定义变量 |
+
+**DevEUI 从哪来？**  
+对于 E77-400M22S，通过 AT 指令查询：
+```bash
+python3 scripts/e77_node_ctrl.py query --port /dev/ttyUSB0
+# 或直接发 AT 指令：
+AT+CDEVEUI=?
+# → 返回: AT+CDEVEUI=AABBCCDD11223344
+```
+每块模块出厂烧写唯一 DevEUI，不能修改。
+
+---
+
+#### 填写密钥（OTAA）
+
+点击 **Submit** 添加设备后，自动跳转到设备详情页。  
+进入 **Keys (OTAA)** 标签页：
+
+| 字段 | 字节数 | 说明 |
+|------|--------|------|
+| **Application key（AppKey）** | 16B | **最关键的密钥**。节点侧和 NS 侧共同持有，用于推导所有 Session Key。必须与节点固件中烧写的 AppKey 完全一致（大小写不敏感） |
+| **NwkKey**（仅 1.1）| 16B | LoRaWAN 1.1 新增的网络密钥，与 AppKey 分离。1.0.x 设备无此字段 |
+
+**AppKey 是什么，为什么重要？**
+
+AppKey 是根密钥（Root Key），OTAA 入网时：
+```
+NwkSKey = aes128_encrypt(AppKey, 0x01 || AppNonce || NetID || DevNonce || pad)
+AppSKey = aes128_encrypt(AppKey, 0x02 || AppNonce || NetID || DevNonce || pad)
+```
+- `NwkSKey`（Network Session Key）：用于 MAC 层帧的 MIC 计算和加解密
+- `AppSKey`（Application Session Key）：用于应用 payload 的加解密
+
+AppKey 泄露 = Session Key 可被推算 = 所有历史和未来数据被解密。
+**不同设备必须使用不同的 AppKey**（出厂时各自生成，或由 NS 批量生成后烧写）。
+
+测试时可在 ChirpStack 设备详情页点击 **Generate** 按钮随机生成，
+然后将生成的 32 位 hex 字符串填入节点 `--appkey` 参数。
+
+---
+
+#### 填写密钥（ABP）
+
+ABP 不执行 Join 流程，Session Key 直接预置，需要手动填写激活参数。
+
+进入 **Activation** 标签页：
+
+| 字段 | 字节数 | 说明 |
+|------|--------|------|
+| **Device address（DevAddr）** | 4B | 网络内唯一地址，ABP 时由用户自定，如 `26011234`。OTAA 时由 NS 动态分配，无需手填 |
+| **NwkSEncKey** | 16B | LoRaWAN 1.1：网络层加密 Session Key（1.0.x 中等同于 NwkSKey） |
+| **SNwkSIntKey** | 16B | LoRaWAN 1.1：服务器侧网络层完整性 Key（1.0.x 与 NwkSKey 相同） |
+| **FNwkSIntKey** | 16B | LoRaWAN 1.1：转发侧网络层完整性 Key（1.0.x 与 NwkSKey 相同） |
+| **AppSKey** | 16B | 应用层 Session Key，用于 payload 加解密 |
+| **Uplink frame-counter（FCntUp）** | 4B int | 节点上行帧计数器初始值。通常填 `0`，与节点侧同步 |
+| **Downlink frame-counter（NFCntDown）** | 4B int | NS 下行帧计数器初始值，通常 `0` |
+
+> **ABP 注意**：ABP Session Key 是静态的，永不更新，安全性低于 OTAA。
+> 且 FCntUp 一旦超过上限（2^32）或设备重烧（FCntUp 归零），
+> 若 NS 未关闭 FCnt 检查，所有包会被丢弃。
+> **调试 ABP 时务必勾选 Skip frame-counter checks**，
+> 并在 Device Profile 中关闭 FCnt rollover 检查。
+
+---
+
+### 3.5 验证设备注册成功
+
+注册并填写密钥后，运行节点脚本触发 OTAA 入网：
+
+```bash
+python3 scripts/e77_node_ctrl.py otaa \
+    --port /dev/ttyUSB0 --region 2 \
+    --deveui <DEVEUI> --appkey <APPKEY> \
+    --chanmask 0000:0000:0000:0000:0000:00FF
+```
+
+**成功标志（按顺序）：**
+
+| 序号 | 观察位置 | 预期现象 |
+|------|---------|---------|
+| 1 | 节点串口 | `+EVT:JOINED` |
+| 2 | ChirpStack GUI → Device → **Events** | 出现 `join` 事件 |
+| 3 | GUI → Device → **Activation** | 显示当前 DevAddr / NwkSKey / AppSKey |
+| 4 | 发送上行后 → **LoRaWAN frames** | 出现 `UnconfirmedDataUp` 帧，payload 已解密 |
+| 5 | **Events** 标签 | 出现 `up` 事件，data 字段显示 base64 payload |
 
 ---
 
