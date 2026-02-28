@@ -2090,7 +2090,11 @@ int pkt_fwd_main(void)
         } else {
             printf("### Concentrator temperature: %.0f C ###\n", temperature);
 
-            snprintf(out_info, 22, "Temp=%.1fC  GPS=(N/A)", temperature);
+            if (coord_ok == true) {
+                snprintf(out_info, 22, "Temp=%.1fC GPS=OK    ", temperature);
+            } else {
+                snprintf(out_info, 22, "Temp=%.1fC GPS=(N/A)", temperature);
+            }
             if(wifi_ready == true)  // only update time if wifi is ready
                 oled_show_one_line(0, 7, out_info, 1);
         }
