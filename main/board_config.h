@@ -36,8 +36,16 @@
 #define I2C_MASTER_NUM      0
 
 /* ---------------------------------------------------------------
- * GPS UART
+ * GPS
+ * GPS_ENABLE      1 = GPS hardware present and enabled
+ *                 0 = disable all GPS code (no threads, no UART)
+ * GPS_LOG_VERBOSE 0 = silent
+ *                 1 = key events only (sync acquired, fix status, warnings)
+ *                 2 = full NMEA dump every cycle (wiring / baud-rate debug)
  * --------------------------------------------------------------- */
+#define GPS_ENABLE       1
+#define GPS_LOG_VERBOSE  0
+
 #define GPS_UART_TXD  (GPIO_NUM_19)   /* ESP TX  -> GPS module RX */
 #define GPS_UART_RXD  (GPIO_NUM_20)   /* ESP RX  <- GPS module TX */
 
