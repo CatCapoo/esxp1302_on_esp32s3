@@ -44,7 +44,7 @@
  *                 2 = full NMEA dump every cycle (wiring / baud-rate debug)
  * --------------------------------------------------------------- */
 #define GPS_ENABLE       1
-#define GPS_LOG_VERBOSE  0
+#define GPS_LOG_VERBOSE  1
 
 #define GPS_UART_TXD  (GPIO_NUM_19)   /* ESP TX  -> GPS module RX */
 #define GPS_UART_RXD  (GPIO_NUM_20)   /* ESP RX  <- GPS module TX */
