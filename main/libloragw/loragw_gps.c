@@ -60,6 +60,9 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 
 #define UBX_MSG_NAVTIMEGPS_LEN  16
 
+#define UNIX_GPS_EPOCH_OFFSET   315964800  /* seconds between UNIX epoch (1970-01-01) and GPS epoch (1980-01-06) */
+#define GPS_LEAP_SECONDS        18         /* GPS-UTC leap seconds offset (as of 2017, valid through at least 2026) */
+
 /* -------------------------------------------------------------------------- */
 /* --- PRIVATE VARIABLES ---------------------------------------------------- */
 
@@ -578,13 +581,39 @@ int lgw_gps_get(struct timespec *utc, struct timespec *gps_time, struct coord_s 
             DEBUG_MSG("ERROR: NO VALID TIME TO RETURN\n");
             return LGW_GPS_ERROR;
         }
-        fractpart = modf(((double)gps_iTOW / 1E3) + ((double)gps_fTOW / 1E9), &intpart);
-        /* Number of seconds since beginning on current GPS week */
-        gps_time->tv_sec = (time_t)intpart;
-        /* Number of seconds since GPS epoch 06.Jan.1980 */
-        gps_time->tv_sec += (time_t)gps_week * 604800; /* day*hours*minutes*secondes: 7*24*60*60; */
-        /* Fractional part in nanoseconds */
-        gps_time->tv_nsec = (long)(fractpart * 1E9);
+        if (gps_week != 0) {
+            /* UBX mode: native GPS time available (iTOW + week number) */
+            fractpart = modf(((double)gps_iTOW / 1E3) + ((double)gps_fTOW / 1E9), &intpart);
+            /* Number of seconds since beginning on current GPS week */
+            gps_time->tv_sec = (time_t)intpart;
+            /* Number of seconds since GPS epoch 06.Jan.1980 */
+            gps_time->tv_sec += (time_t)gps_week * 604800; /* day*hours*minutes*secondes: 7*24*60*60; */
+            /* Fractional part in nanoseconds */
+            gps_time->tv_nsec = (long)(fractpart * 1E9);
+        } else {
+            /* NMEA-only mode (e.g. ATGM336H): gps_week is never set by UBX.
+               Derive GPS time from UTC: GPS_time = UTC_unix - UNIX_GPS_EPOCH_OFFSET + GPS_LEAP_SECONDS */
+            struct tm gps_tm;
+            time_t gps_unix;
+            memset(&gps_tm, 0, sizeof(gps_tm));
+            if (gps_yea < 100) {
+                gps_tm.tm_year = gps_yea + 100;
+            } else {
+                gps_tm.tm_year = gps_yea - 1900;
+            }
+            gps_tm.tm_mon  = gps_mon - 1;
+            gps_tm.tm_mday = gps_day;
+            gps_tm.tm_hour = gps_hou;
+            gps_tm.tm_min  = gps_min;
+            gps_tm.tm_sec  = gps_sec;
+            gps_unix = mktime(&gps_tm);
+            if (gps_unix == (time_t)(-1)) {
+                DEBUG_MSG("ERROR: FAILED TO CONVERT BROKEN-DOWN TIME FOR GPS\n");
+                return LGW_GPS_ERROR;
+            }
+            gps_time->tv_sec  = gps_unix - UNIX_GPS_EPOCH_OFFSET + GPS_LEAP_SECONDS;
+            gps_time->tv_nsec = (int32_t)(gps_fra * 1e9);
+        }
     }
     if (loc != NULL) {
         if (!gps_pos_ok) {
