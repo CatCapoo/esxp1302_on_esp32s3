@@ -1,0 +1,55 @@
+/*
+ * loragw_com.h  –  Communication abstraction (SPI-only for STM32)
+ */
+
+#ifndef _LORAGW_COM_H
+#define _LORAGW_COM_H
+
+#include <stdint.h>
+#include "config.h"
+
+/* -------------------------------------------------------------------------- */
+/* --- PUBLIC CONSTANTS ----------------------------------------------------- */
+
+#define LGW_COM_SUCCESS     0
+#define LGW_COM_ERROR       -1
+
+#define LGW_SPI_MUX_TARGET_SX1302   0x00
+#define LGW_SPI_MUX_TARGET_RADIOA   0x01
+#define LGW_SPI_MUX_TARGET_RADIOB   0x02
+
+/* -------------------------------------------------------------------------- */
+/* --- PUBLIC TYPES --------------------------------------------------------- */
+
+typedef enum com_type_e {
+    LGW_COM_SPI,
+    LGW_COM_USB,
+    LGW_COM_UNKNOWN
+} lgw_com_type_t;
+
+typedef enum com_write_mode_e {
+    LGW_COM_WRITE_MODE_SINGLE,
+    LGW_COM_WRITE_MODE_BULK,
+    LGW_COM_WRITE_MODE_UNKNOWN
+} lgw_com_write_mode_t;
+
+/* -------------------------------------------------------------------------- */
+/* --- PUBLIC FUNCTIONS PROTOTYPES ------------------------------------------ */
+
+int lgw_com_open(lgw_com_type_t com_type, const char *com_path);
+int lgw_com_close(void);
+
+int lgw_com_w(uint8_t spi_mux_target, uint16_t address, uint8_t data);
+int lgw_com_r(uint8_t spi_mux_target, uint16_t address, uint8_t *data);
+int lgw_com_rmw(uint8_t spi_mux_target, uint16_t address, uint8_t offs, uint8_t leng, uint8_t data);
+int lgw_com_wb(uint8_t spi_mux_target, uint16_t address, const uint8_t *data, uint16_t size);
+int lgw_com_rb(uint8_t spi_mux_target, uint16_t address, uint8_t *data, uint16_t size);
+
+int lgw_com_set_write_mode(lgw_com_write_mode_t write_mode);
+int lgw_com_flush(void);
+uint16_t lgw_com_chunk_size(void);
+
+void* lgw_com_target(void);
+lgw_com_type_t lgw_com_type(void);
+
+#endif

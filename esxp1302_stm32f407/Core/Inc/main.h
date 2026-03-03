@@ -66,10 +66,10 @@ void Error_Handler(void);
 #define LED1_GPIO_Port GPIOF
 #define KEY_UP_Pin GPIO_PIN_0
 #define KEY_UP_GPIO_Port GPIOA
-#define SX1302_NSS_Pin GPIO_PIN_12
-#define SX1302_NSS_GPIO_Port GPIOB
-#define SX1302_RESET_Pin GPIO_PIN_9
-#define SX1302_RESET_GPIO_Port GPIOD
+#define SX1302_RESET_Pin GPIO_PIN_8
+#define SX1302_RESET_GPIO_Port GPIOA
+#define SX1302_NSS_Pin GPIO_PIN_2
+#define SX1302_NSS_GPIO_Port GPIOD
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

@@ -21,6 +21,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "dma.h"
+#include "i2c.h"
 #include "spi.h"
 #include "tim.h"
 #include "usart.h"
@@ -92,11 +93,12 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
-  MX_SPI2_Init();
   MX_TIM2_Init();
   MX_USART1_UART_Init();
+  MX_SPI3_Init();
+  MX_I2C2_Init();
   /* USER CODE BEGIN 2 */
-  /* 启动 TIM2 微秒计时�?? */
+  /* 启动 TIM2 微秒计时�???? */
   HAL_TIM_Base_Start(&htim2);
 
   /* 串口打印 */
@@ -168,6 +170,15 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+/**
+ * @brief  Retarget printf to UART1
+ */
+int __io_putchar(int ch)
+{
+    HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+    return ch;
+}
 
 /* USER CODE END 4 */
 

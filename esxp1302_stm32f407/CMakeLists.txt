@@ -45,19 +45,52 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined library search paths
 )
 
+# ---------------------------------------------------------------------------
+# LoRaGW library sources
+# ---------------------------------------------------------------------------
+set(LORAGW_SOURCES
+    libloragw/loragw_spi.c
+    libloragw/loragw_com.c
+    libloragw/loragw_aux.c
+    libloragw/loragw_reg.c
+    libloragw/loragw_gpio.c
+    libloragw/loragw_sx1250.c
+    libloragw/loragw_sx1302.c
+    libloragw/loragw_debug.c
+    libloragw/sx1250_spi.c
+    libloragw/sx1250_com.c
+    libtools/tinymt32.c
+)
+
+# ---------------------------------------------------------------------------
+# Test sources
+# ---------------------------------------------------------------------------
+set(TEST_SOURCES
+    test/test_loragw_spi.c
+    test/test_loragw_spi_sx1250.c
+    test/test_loragw_reg.c
+)
+
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user sources here
+    ${LORAGW_SOURCES}
+    ${TEST_SOURCES}
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined include paths
+    libloragw
+    libtools
+    test
 )
 
-# Add project symbols (macros)
+# ---------------------------------------------------------------------------
+# Test selection  –  uncomment exactly ONE of the following lines
+# ---------------------------------------------------------------------------
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined symbols
+    # TEST_LORAGW_SPI             # SPI read/write stress test
+    # TEST_LORAGW_SPI_SX1250      # SX1250 register R/W via SX1302
+    TEST_LORAGW_REG             # SX1302 register default-value & R/W test
 )
 
 # Add linked libraries
