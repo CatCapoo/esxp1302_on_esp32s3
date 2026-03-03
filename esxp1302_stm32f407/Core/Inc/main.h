@@ -66,6 +66,10 @@ void Error_Handler(void);
 #define LED1_GPIO_Port GPIOF
 #define KEY_UP_Pin GPIO_PIN_0
 #define KEY_UP_GPIO_Port GPIOA
+#define W5500_RES_Pin GPIO_PIN_2
+#define W5500_RES_GPIO_Port GPIOA
+#define W5500_NSS_Pin GPIO_PIN_3
+#define W5500_NSS_GPIO_Port GPIOA
 #define SX1302_RESET_Pin GPIO_PIN_8
 #define SX1302_RESET_GPIO_Port GPIOA
 #define SX1302_NSS_Pin GPIO_PIN_2

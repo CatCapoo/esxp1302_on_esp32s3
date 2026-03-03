@@ -42,16 +42,16 @@ E77 模块 **仅支持 LoRaWAN**（不支持 P2P 原始 LoRa），所以使用 d
 
 ```powershell
 # 基本用法: SF10, 每 10 秒发一包, 无限循环
-python scripts/e77_node_tx.py --port COM11
+python scripts/e77_node_tx.py --port COM18
 
 # 快速测试: SF7, 间隔 5s, 发 20 包
-python scripts/e77_node_tx.py --port COM11 --interval 5 --count 20 --dr 5
+python scripts/e77_node_tx.py --port COM18 --interval 5 --count 20 --dr 5
 
 # 详细调试模式
-python scripts/e77_node_tx.py --port COM11 --verbose
+python scripts/e77_node_tx.py --port COM18 --verbose
 
 # 指定自定义 payload
-python scripts/e77_node_tx.py --port COM11 --payload "0102030405060708"
+python scripts/e77_node_tx.py --port COM18 --payload "0102030405060708"
 ```
 
 ### 工作流程
@@ -130,7 +130,7 @@ Windows 系统上可能存在多个 COM 端口:
 | 端口 | 设备 |
 |------|------|
 | COM3 | 蓝牙虚拟串口 (不是 E77!) |
-| COM11 | E77-400M22S 模块 |
+| COM18 | E77-400M22S 模块 |
 
 **确认方法**:
 1. 设备管理器查看 "端口 (COM 和 LPT)" 类别
