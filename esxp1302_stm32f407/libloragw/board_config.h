@@ -11,6 +11,7 @@
 
 #include "main.h"          /* CubeMX-generated pin defines */
 #include "spi.h"           /* hspi3 handle */
+#include "i2c.h"           /* hi2c2 handle */
 
 /* ---------------------------------------------------------------
  * SX1302 SPI bus  (directly uses CubeMX SPI3 + software CS)
@@ -36,3 +37,9 @@
  * Keys  (already defined in main.h)
  * --------------------------------------------------------------- */
 /* KEY0 = PE4 (pull-up), KEY_UP = PA0 (pull-down) */
+
+/* ---------------------------------------------------------------
+ * I2C bus  (CubeMX I2C2  PF0-SDA / PF1-SCL  100 kHz)
+ * --------------------------------------------------------------- */
+#define I2C_HANDLE        (&hi2c2)
+#define I2C_TIMEOUT_MS    100

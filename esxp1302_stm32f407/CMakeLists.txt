@@ -69,11 +69,23 @@ set(TEST_SOURCES
     test/test_loragw_spi.c
     test/test_loragw_spi_sx1250.c
     test/test_loragw_reg.c
+    test/test_loragw_i2c_oled.c
+    test/test_loragw_i2c_lm75a.c
+)
+
+# ---------------------------------------------------------------------------
+# LoRaGW I2C peripheral sources
+# ---------------------------------------------------------------------------
+set(I2C_SOURCES
+    libloragw/loragw_i2c.c
+    libloragw/loragw_lm75a.c
+    libloragw/loragw_oled.c
 )
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${LORAGW_SOURCES}
+    ${I2C_SOURCES}
     ${TEST_SOURCES}
 )
 
@@ -90,7 +102,9 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # TEST_LORAGW_SPI             # SPI read/write stress test
     # TEST_LORAGW_SPI_SX1250      # SX1250 register R/W via SX1302
-    TEST_LORAGW_REG             # SX1302 register default-value & R/W test
+    # TEST_LORAGW_REG             # SX1302 register default-value & R/W test
+    # TEST_LORAGW_I2C_OLED        # SSD1306 OLED on I2C2
+    TEST_LORAGW_I2C_LM75A      # LM75A temperature sensor on I2C2
 )
 
 # Add linked libraries
