@@ -1,0 +1,51 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "CMake Configure",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["--preset", "Debug"],
+            "options": {
+                "cwd": "${workspaceFolder}/esxp1302_stm32f407"
+            },
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Build",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["--build", "--preset", "Debug", "-j8"],
+            "options": {
+                "cwd": "${workspaceFolder}/esxp1302_stm32f407"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": ["relative", "${workspaceFolder}/esxp1302_stm32f407"]
+            }
+        },
+        {
+            "label": "Clean",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["--build", "--preset", "Debug", "--target", "clean"],
+            "options": {
+                "cwd": "${workspaceFolder}/esxp1302_stm32f407"
+            },
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Rebuild",
+            "dependsOrder": "sequence",
+            "dependsOn": ["Clean", "Build"],
+            "group": "build",
+            "problemMatcher": []
+        }
+    ]
+}

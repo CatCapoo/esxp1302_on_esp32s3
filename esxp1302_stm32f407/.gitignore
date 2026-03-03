@@ -1,0 +1,15 @@
+# CMake build output
+build/
+
+# CubeMX IDE backup files
+.cproject.bak
+.project.bak
+
+# Compiled output
+*.elf
+*.bin
+*.hex
+*.map
+
+# Editor
+.DS_Store
