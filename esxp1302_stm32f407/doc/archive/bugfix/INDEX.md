@@ -1,0 +1,15 @@
+# Bug 淇敼璁板綍绱㈠紩
+
+| 缂栧彿 | 鏃ユ湡 | 鏂囦欢 | 绠€瑕佹弿杩?| 涓ラ噸绾у埆 |
+|------|------|------|----------|----------|
+| [BUG-001](BUG-001_test_network_connection_compile_errors.md) | 2026-02-19 | `main/test/test_network_connection.c` | 鏍煎紡绗︾被鍨嬩笉鍖归厤銆亁TaskCreate鍙傛暟杩囧銆乪sp_console API搴熷純銆佷簨浠跺彞鏌勬敞閿€浼犲弽 | 缂栬瘧澶辫触 + 杩愯宕╂簝 |
+| [BUG-002](BUG-002_radio_spi_rb_wrong_frame_format.md) | 2026-02-19 | `main/libloragw/loragw_spi.c` | `radio_spi_rb` SPI 甯?address_bits 澶?瀛楄妭涓?tx_buffer 鍏ㄩ浂锛屽鑷?SX1250 瀵勫瓨鍣ㄥ洖璇诲叏闆?| 鍔熻兘鎬ч敊璇?|
+| [BUG-003](BUG-003_test_loragw_hal_rx_compile_errors.md) | 2026-02-19 | `main/test/test_loragw_hal_rx.c` | 鏍煎紡绗︾被鍨嬩笉鍖归厤锛坄%d` vs `uint32_t`锛夈€乪sp_console REPL API搴熷純 | 缂栬瘧澶辫触 |
+| [BUG-004](BUG-004_gpio_pin_mask_error_enum_in_preprocessor.md) | 2026-02-19 | `main/libloragw/loragw_gpio.h` | `SX1302_POWER_EN_PIN` 榛樿鍊间负鏋氫妇 `GPIO_NUM_NC`锛岄澶勭悊鍣?`#if` 鏃犳硶璇嗗埆鏋氫妇鍊煎皢鍏跺綋 `0` 澶勭悊锛屽鑷?`pin_bit_mask` 鍚棤鏁堜綅锛宍gpio_config()` 鎶?GPIO_PIN mask error | 鍔熻兘鎬ч敊璇?|
+| [BUG-005](BUG-005_test_loragw_cal_compile_errors_and_invalid_for_sx1250.md) | 2026-02-20 | `main/test/test_loragw_cal.c` | 鍑芥暟鍚嶅彉鏇达紙`lgw_sx125x_reg_w/r`鈫抈sx125x_reg_w/r`锛夈€佹牸寮忕绫诲瀷涓嶅尮閰嶃€乣lgw_connect` 鍙傛暟涓嶈冻銆丗reeRTOS 澶存枃浠剁己澶憋紱鍙︼細璇ユ祴璇曚粎閫傜敤浜?SX1255/SX1257锛屽湪 SX1250 骞冲彴涓婃祴璇曠粨鏋滃畬鍏ㄦ棤鏁?| 缂栬瘧澶辫触 + 鍔熻兘鎬ф棤鏁?|
+| [BUG-006](BUG-006_cmake_include_dirs_multiple_declaration.md) | 2026-02-20 | `main/CMakeLists.txt` | `idf_component_register` 涓娆″０鏄?`INCLUDE_DIRS`锛孋Make 鍙繚鐣欐渶鍚庝竴鏉★紝`main/` 鏍圭洰褰曞強鍏朵綑瀛愮洰褰曞ご鏂囦欢鍧囦笉鍙锛屽鑷?`global_json.h` 缂栬瘧澶辫触 | 缂栬瘧澶辫触 |
+| [BUG-007](BUG-007_webpage_h_not_generated_by_idf_build.md) | 2026-02-20 | `main/packet_forwarder/webpage.h`锛堢敓鎴愭枃浠讹級 | `webpage.h` 鐢?PlatformIO 棰勬瀯寤洪挬瀛愮敓鎴愶紝ESP-IDF CMake 鏋勫缓涓嶈嚜鍔ㄦ墽琛岋紝棣栨鏋勫缓鎴?clean 鍚庨渶鎵嬪姩杩愯 `scripts/dump_html.py` | 缂栬瘧澶辫触 |
+| [BUG-008](BUG-008_esp32s3_invalid_gpio_pin_defaults.md) | 2026-02-20 | `main/libloragw/loragw_i2c.h`銆乣main/packet_forwarder/lora_pkt_fwd.c`銆乣main/board_config.h` | I2C 寮曡剼榛樿 GPIO 22锛圗SP32-S3 涓嶅瓨鍦級锛屾寜閿紩鑴氶粯璁?GPIO 23/25锛圗SP32-S3 涓嶅瓨鍦級锛屽鑷磋繍琛屾椂 `i2c_set_pin error` 鍜?`gpio_set_direction error`锛涙柊寤?`board_config.h` 缁熶竴绠＄悊 | 杩愯鏃跺穿婧?|
+| [BUG-009](BUG-009_http_431_httpd_max_req_hdr_len_too_small.md) | 2026-02-20 | `sdkconfig`銆乣sdkconfig.defaults` | `CONFIG_HTTPD_MAX_REQ_HDR_LEN` 榛樿鍊?512 瀛楄妭涓嶅鐜颁唬娴忚鍣ㄨ姹傚ご锛學eb 閰嶇疆椤甸潰杩斿洖 HTTP 431锛沗httpd_config_t` 鏃犺繍琛屾椂瀛楁锛屽彧鑳介€氳繃 Kconfig 缂栬瘧鏃惰皟鏁翠负 2048 | 鍔熻兘鎬ч敊璇?|
+| [BUG-011](BUG-011_tmms_wrong_gps_epoch_nmea_only.md) | 2026-03-02 | `main/libloragw/loragw_gps.c` | `gps_gps_time` 浠呯敱 UBX NAV-TIMEGPS 娑堟伅璧嬪€硷紝ATGM336H锛圢MEA-only锛夋案杩滀笉鍙戞甯э紝瀵艰嚧 `ref.gps={0,0}`锛宍lgw_cnt2gps()` 杈撳嚭绾︾瓑浜庤澶囪繍琛屾椂闂达紝`tmms` 鏄剧ず 1980 GPS 绾厓闄勮繎锛堝 `523537 ms`锛夎€岄潪褰撳墠鏃堕棿锛堢害 `1456477xxxxx ms`锛夈€備慨澶嶏細浠?`gps_week` 涓烘爣蹇楀尯鍒?UBX/NMEA 妯″紡锛孨MEA 妯″紡涓嬩粠 UTC 娲剧敓 GPS 绾厓鏃堕棿 | 鍔熻兘鎬ч敊璇?|
+| [BUG-010](BUG-010_push_data_ack_low_out_of_sync.md) | 2026-02-21 | `main/packet_forwarder/lora_pkt_fwd.c`銆乣global_conf.cn490.json` | 鍥涗釜鐙珛闂瀵艰嚧 ackr 浣庤嚦 22%锛氣憼 MQTT TLS 闃诲 10s锛涒憽 `tv_usec` 婧㈠嚭锛坄PUSH_TIMEOUT_MS=2000` 鈫?`tv_usec=1,000,000`锛宭wIP 澶勭悊涓?0锛夛紱鈶?drain 寰幆鍙?`setsockopt` 澶辫触椋庨櫓锛涒懀 WiFi Modem Sleep 瀵艰嚧 AP 缂撳啿 ACK 100鈥?00ms 瓒呭嚭 recv() 绐楀彛銆備慨澶嶅悗 ackr 杈?86鈥?00% | 鍔熻兘鎬ч敊璇?|

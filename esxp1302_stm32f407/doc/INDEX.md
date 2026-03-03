@@ -1,0 +1,77 @@
+# ESXP1302 STM32F407 移植文档总索引
+
+> **项目**：SX1302 LoRa 网关驱动 — 从 ESP32S3 (ESP-IDF) 移植到 STM32F407ZGT6 (STM32 HAL + FreeRTOS)  
+> **分支**：`F407`  
+> **日期**：2026-02-28 ~ 2026-03-03  
+> **状态**：SPI/REG/SX1250/OLED/LM75A/HAL-RX/HAL-TX 全部硬件验证通过
+
+---
+
+## 一、时间线还原路径（按顺序阅读可完整复现）
+
+按以下顺序阅读并操作，即可从零完成全部移植工作：
+
+| 阶段 | 文档 | 说明 |
+|------|------|------|
+| 1 | [hardware/01_hardware_overview.md](hardware/01_hardware_overview.md) | 硬件平台、接线、引脚映射 |
+| 2 | [impl/01_cmake_setup.md](impl/01_cmake_setup.md) | CubeMX 工程 + CMake + VS Code 搭建 |
+| 3 | [impl/02_platform_adapt.md](impl/02_platform_adapt.md) | 所有 ESP32→STM32 适配改动 |
+| 4 | [impl/03_driver_layers.md](impl/03_driver_layers.md) | 驱动层文件清单与依赖关系 |
+| 5 | [testing/01_bringup_tests.md](testing/01_bringup_tests.md) | SPI/SX1250/REG/OLED/LM75A 五项测试 |
+| 6 | [testing/02_hal_rx_test.md](testing/02_hal_rx_test.md) | HAL RX 测试（含 E77 节点配置） |
+| 7 | [testing/03_hal_tx_test.md](testing/03_hal_tx_test.md) | HAL TX 测试（含 SX1278 接收配置） |
+| 随用 | [testing/04_scripts_reference.md](testing/04_scripts_reference.md) | Python 测试脚本用法手册 |
+
+---
+
+## 二、分类速查
+
+### 硬件 / 接线
+- [hardware/01_hardware_overview.md](hardware/01_hardware_overview.md) — 引脚映射、外设配置
+
+### 工程搭建 / 代码适配
+- [impl/01_cmake_setup.md](impl/01_cmake_setup.md) — CMake + Ninja + CubeMX
+- [impl/02_platform_adapt.md](impl/02_platform_adapt.md) — 平台适配速查表
+- [impl/03_driver_layers.md](impl/03_driver_layers.md) — 源文件依赖关系
+
+### 测试流程 / 脚本
+- [testing/01_bringup_tests.md](testing/01_bringup_tests.md) — 底层外设测试
+- [testing/02_hal_rx_test.md](testing/02_hal_rx_test.md) — 网关收包测试
+- [testing/03_hal_tx_test.md](testing/03_hal_tx_test.md) — 网关发包测试
+- [testing/04_scripts_reference.md](testing/04_scripts_reference.md) — E77 脚本
+
+### 背景知识
+- [learning/01_sx1302_architecture.md](learning/01_sx1302_architecture.md) — SX1302 架构
+- [learning/02_lorawan_basics.md](learning/02_lorawan_basics.md) — LoRaWAN / CN470
+- [learning/03_stm32_hal_notes.md](learning/03_stm32_hal_notes.md) — STM32 HAL 注意事项
+- [learning/04_lora_rf_notes.md](learning/04_lora_rf_notes.md) — LoRa RF 参数
+
+### Bug 速查
+- [troubleshooting/bugs_and_fixes.md](troubleshooting/bugs_and_fixes.md) — 全部问题与修复
+
+### 参考资料
+- [references/INDEX.md](references/INDEX.md) — 数据手册 / AT 命令 / 标准文档
+
+### ESP32 原始文档（待整理）
+- [archive/INDEX.md](archive/INDEX.md) — bringup/test 分支原始 doc
+
+---
+
+## 三、关键源文件索引
+
+| 源文件 | 说明 | 详见文档 |
+|--------|------|----------|
+| `board_config.h` | 引脚映射 / SPI / I2C / GPIO 配置 | [hardware/01](hardware/01_hardware_overview.md) |
+| `config.h` | 调试开关 | [impl/03](impl/03_driver_layers.md) |
+| `loragw_spi.c/h` | SX1302 SPI 驱动 | [impl/02](impl/02_platform_adapt.md), [impl/03](impl/03_driver_layers.md) |
+| `loragw_aux.c/h` | 定时、超时、ToA 计算 | [impl/02](impl/02_platform_adapt.md) |
+| `loragw_gpio.c/h` | SX1302 复位 GPIO | [impl/02](impl/02_platform_adapt.md) |
+| `loragw_i2c.c/h` | I2C 总线驱动 | [impl/02](impl/02_platform_adapt.md), [impl/03](impl/03_driver_layers.md) |
+| `loragw_hal.c` | 核心 HAL（start/stop/receive/send） | [impl/03](impl/03_driver_layers.md) |
+| `loragw_sx1302.c/h` | SX1302 寄存器+通道配置 | [impl/03](impl/03_driver_layers.md) |
+| `loragw_cal.c/h` | 校准流程 | [impl/03](impl/03_driver_layers.md) |
+| `test_loragw.h` | 测试选择器 | [testing/01](testing/01_bringup_tests.md) |
+| `test_loragw_hal_rx.c` | HAL RX 测试 | [testing/02](testing/02_hal_rx_test.md) |
+| `test_loragw_hal_tx.c` | HAL TX 测试 | [testing/03](testing/03_hal_tx_test.md) |
+| `scripts/e77_node_tx.py` | E77 节点发包脚本 | [testing/04](testing/04_scripts_reference.md) |
+| `scripts/e77_probe.py` | E77 串口探测脚本 | [testing/04](testing/04_scripts_reference.md) |
