@@ -1,0 +1,7 @@
+# ESP-IDF build output and source (belongs to other branches)
+build/
+main/
+
+# CubeMX IDE backup files
+.cproject.bak
+.project.bak
