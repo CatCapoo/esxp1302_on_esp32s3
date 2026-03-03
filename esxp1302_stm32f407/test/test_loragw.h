@@ -8,6 +8,7 @@
  *   TEST_LORAGW_I2C_OLED      – SSD1306 OLED on I2C2 (PF0/PF1)
  *   TEST_LORAGW_I2C_LM75A     – LM75A temperature sensor on I2C2
  *   TEST_W5500_UDP             – W5500 Ethernet + UDP echo test
+ *   TEST_CONFIG_CLI            – Flash config R/W + UART CLI validation
  */
 
 #ifndef _TEST_LORAGW_H
@@ -20,6 +21,7 @@ void test_loragw_reg(void);
 void test_loragw_i2c_oled(void);
 void test_loragw_i2c_lm75a(void);
 void test_w5500_udp(void);
+void test_config_cli(void);
 
 /**
  * @brief Run the selected test. Call from a FreeRTOS task.
@@ -37,6 +39,8 @@ static inline void test_loragw_run(void) {
     test_loragw_i2c_lm75a();
 #elif defined(TEST_W5500_UDP)
     test_w5500_udp();
+#elif defined(TEST_CONFIG_CLI)
+    test_config_cli();
 #else
     #error "No test selected. See test_loragw.h for available TEST_LORAGW_* macros."
 #endif

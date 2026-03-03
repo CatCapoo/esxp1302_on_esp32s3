@@ -59,6 +59,8 @@ set(LORAGW_SOURCES
     libloragw/loragw_debug.c
     libloragw/sx1250_spi.c
     libloragw/sx1250_com.c
+    libloragw/gateway_config.c
+    libloragw/uart_cli.c
     libtools/tinymt32.c
 )
 
@@ -72,6 +74,7 @@ set(TEST_SOURCES
     test/test_loragw_i2c_oled.c
     test/test_loragw_i2c_lm75a.c
     test/test_w5500_udp.c
+    test/test_config_cli.c
 )
 
 # ---------------------------------------------------------------------------
@@ -117,7 +120,8 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # TEST_LORAGW_REG             # SX1302 register default-value & R/W test
     # TEST_LORAGW_I2C_OLED        # SSD1306 OLED on I2C2
     # TEST_LORAGW_I2C_LM75A      # LM75A temperature sensor on I2C2
-    TEST_W5500_UDP              # W5500 Ethernet + UDP echo test
+    # TEST_W5500_UDP              # W5500 Ethernet + UDP echo test
+    TEST_CONFIG_CLI             # Flash config R/W + UART CLI validation
 )
 
 # Add linked libraries
