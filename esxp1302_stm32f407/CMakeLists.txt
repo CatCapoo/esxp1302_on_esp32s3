@@ -71,6 +71,7 @@ set(TEST_SOURCES
     test/test_loragw_reg.c
     test/test_loragw_i2c_oled.c
     test/test_loragw_i2c_lm75a.c
+    test/test_w5500_udp.c
 )
 
 # ---------------------------------------------------------------------------
@@ -82,10 +83,20 @@ set(I2C_SOURCES
     libloragw/loragw_oled.c
 )
 
+# ---------------------------------------------------------------------------
+# W5500 Ethernet sources (WIZnet ioLibrary)
+# ---------------------------------------------------------------------------
+set(W5500_SOURCES
+    W5500/Src/w5500.c
+    W5500/Src/wizchip_conf.c
+    W5500/Src/socket.c
+)
+
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${LORAGW_SOURCES}
     ${I2C_SOURCES}
+    ${W5500_SOURCES}
     ${TEST_SOURCES}
 )
 
@@ -94,6 +105,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     libloragw
     libtools
     test
+    W5500/Inc
 )
 
 # ---------------------------------------------------------------------------
@@ -104,7 +116,8 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # TEST_LORAGW_SPI_SX1250      # SX1250 register R/W via SX1302
     # TEST_LORAGW_REG             # SX1302 register default-value & R/W test
     # TEST_LORAGW_I2C_OLED        # SSD1306 OLED on I2C2
-    TEST_LORAGW_I2C_LM75A      # LM75A temperature sensor on I2C2
+    # TEST_LORAGW_I2C_LM75A      # LM75A temperature sensor on I2C2
+    TEST_W5500_UDP              # W5500 Ethernet + UDP echo test
 )
 
 # Add linked libraries
