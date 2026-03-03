@@ -43,7 +43,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         return;
     }
 
+    /* Snapshot and re-arm IMMEDIATELY – never miss the next byte */
     uint8_t c = s_rx_byte;
+    HAL_UART_Receive_IT(&huart1, (uint8_t *)&s_rx_byte, 1);
 
     /* Echo back */
     HAL_UART_Transmit(&huart1, &c, 1, 10);
@@ -68,9 +70,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     } else if (s_rx_pos < CLI_LINE_MAX - 1) {
         s_rx_line[s_rx_pos++] = (char)c;
     }
-
-    /* Re-arm for next byte */
-    HAL_UART_Receive_IT(&huart1, (uint8_t *)&s_rx_byte, 1);
+    /* No re-arm here – already done at the top */
 }
 
 /* ------------------------------------------------------------------ */
@@ -166,7 +166,9 @@ static void cmd_config_set(int argc, char *argv[])
             eui = (eui << 4) | nibble;
         }
         cfg->gateway_eui = eui;
-        printf("[CLI] gw_eui = %016llX\r\n", (unsigned long long)cfg->gateway_eui);
+        printf("[CLI] gw_eui = %08X%08X\r\n",
+               (unsigned)((eui >> 32) & 0xFFFFFFFFUL),
+               (unsigned)(eui & 0xFFFFFFFFUL));
 
     } else if (strcmp(key, "eth_ip") == 0) {
         if (parse_ipv4(val, cfg->eth_ip) != 0) {
