@@ -5,6 +5,7 @@
 | [01_cmake_setup.md](01_cmake_setup.md) | CubeMX + CMake + Ninja + VS Code 工程搭建全流程 |
 | [02_platform_adapt.md](02_platform_adapt.md) | ESP32 → STM32 所有适配改动速查表 |
 | [03_driver_layers.md](03_driver_layers.md) | 驱动层源文件清单、依赖关系、编译修复记录 |
+| [04_w5500_ethernet.md](04_w5500_ethernet.md) | W5500 以太网驱动集成：引脚适配、ioLibrary 架构、pkt_fwd 移植准备 |
 
 ## 阅读顺序
 
