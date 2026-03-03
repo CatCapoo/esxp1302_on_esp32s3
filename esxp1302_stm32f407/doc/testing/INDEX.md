@@ -8,6 +8,7 @@
 | [04_scripts_reference.md](04_scripts_reference.md) | Python 测试脚本完整用法手册 |
 | [05_w5500_udp_test.md](05_w5500_udp_test.md) | W5500 以太网 + UDP 双向通信测试 |
 | [06_flash_config_uart_cli_testing.md](06_flash_config_uart_cli_testing.md) | STM32F407 内部 Flash 配置存储 + UART CLI 环形缓冲（CH340 DTR 复位修复）|
+| [07_pkt_fwd_e2e_test.md](07_pkt_fwd_e2e_test.md) | Packet Forwarder 端到端测试：Mock NS ABP 上行验证（已完成）+ ChirpStack OTAA（待做）|
 
 ## 测试顺序
 
@@ -29,6 +30,10 @@ TEST_LORAGW_HAL_RX       ← 网关收包 (配合 E77 节点)
 TEST_LORAGW_HAL_TX       ← 网关发包 (配合 SX1278 验证)
   ↓
 TEST_W5500_UDP           ← W5500 以太网 + UDP 通信
+  ↓
+PKT_FWD + Mock NS        ← Packet Forwarder ABP 上行端到端
+  ↓
+PKT_FWD + ChirpStack     ← OTAA 完整流程（下行 ACK，ADR）
 ```
 
 ## 测试结果速览
@@ -43,3 +48,5 @@ TEST_W5500_UDP           ← W5500 以太网 + UDP 通信
 | HAL RX | ✅ PASS | 收到 E77 ABP 包, SNR 2.8/-1.5/-0.5 dB |
 | HAL TX | ✅ PASS | SX1278 收到 13 包, RSSI -68 dBm |
 | W5500 UDP | ✅ PASS | PHY 链路建立, 5 条消息双向回显正确 |
+| Pkt Fwd + Mock NS | ✅ PASS | ABP 上行 100% 转发，PUSH_ACK RTT 5 ms，ackr 100% |
+| Pkt Fwd + ChirpStack | 🔄 待做 | 需切换到 Linux 以太网，UART CLI 更新 NS IP |

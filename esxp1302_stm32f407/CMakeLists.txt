@@ -46,7 +46,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 )
 
 # ---------------------------------------------------------------------------
-# LoRaGW library sources
+# LoRaGW library sources (core)
 # ---------------------------------------------------------------------------
 set(LORAGW_SOURCES
     libloragw/loragw_spi.c
@@ -62,6 +62,37 @@ set(LORAGW_SOURCES
     libloragw/gateway_config.c
     libloragw/uart_cli.c
     libtools/tinymt32.c
+)
+
+# ---------------------------------------------------------------------------
+# LoRaGW HAL sources (needed by packet forwarder — lgw_start/stop/send/recv)
+# ---------------------------------------------------------------------------
+set(LORAGW_HAL_SOURCES
+    libloragw/loragw_hal.c
+    libloragw/loragw_cal.c
+    libloragw/loragw_sx1302_rx.c
+    libloragw/loragw_sx1302_timestamp.c
+    libloragw/loragw_lbt.c
+    libloragw/loragw_stts751.c
+    libloragw/loragw_ad5338r.c
+    libloragw/loragw_sx125x.c
+    libloragw/loragw_sx1261.c
+    libloragw/sx125x_spi.c
+    libloragw/sx125x_com.c
+    libloragw/sx1261_spi.c
+    libloragw/sx1261_com.c
+    libloragw/sx1261_usb.c
+)
+
+# ---------------------------------------------------------------------------
+# Packet Forwarder sources
+# ---------------------------------------------------------------------------
+set(PKT_FWD_SOURCES
+    packet_forwarder/lora_pkt_fwd.c
+    packet_forwarder/jitqueue.c
+    packet_forwarder/net_transport.c
+    libtools/parson.c
+    libtools/base64.c
 )
 
 # ---------------------------------------------------------------------------
@@ -101,6 +132,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${I2C_SOURCES}
     ${W5500_SOURCES}
     ${TEST_SOURCES}
+    ${LORAGW_HAL_SOURCES}
+    ${PKT_FWD_SOURCES}
 )
 
 # Add include paths
@@ -109,10 +142,11 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     libtools
     test
     W5500/Inc
+    packet_forwarder
 )
 
 # ---------------------------------------------------------------------------
-# Test selection  –  uncomment exactly ONE of the following lines
+# Build mode selection  –  uncomment exactly ONE of the following lines
 # ---------------------------------------------------------------------------
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # TEST_LORAGW_SPI             # SPI read/write stress test
@@ -121,7 +155,8 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # TEST_LORAGW_I2C_OLED        # SSD1306 OLED on I2C2
     # TEST_LORAGW_I2C_LM75A      # LM75A temperature sensor on I2C2
     # TEST_W5500_UDP              # W5500 Ethernet + UDP echo test
-    TEST_CONFIG_CLI             # Flash config R/W + UART CLI validation
+    # TEST_CONFIG_CLI             # Flash config R/W + UART CLI validation
+    PKT_FWD                     # Full packet forwarder mode
 )
 
 # Add linked libraries

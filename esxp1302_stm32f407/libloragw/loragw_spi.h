@@ -13,6 +13,9 @@
 #include "config.h"
 #include "board_config.h"
 
+/* Compatibility typedef: ESP32-origin files use spi_device_handle_t */
+typedef SPI_HandleTypeDef spi_device_handle_t;
+
 /* -------------------------------------------------------------------------- */
 /* --- PUBLIC CONSTANTS ----------------------------------------------------- */
 

@@ -6,8 +6,8 @@
  *
  * Config parameters (pkt_fwd relevant):
  *   - ns_host        LoRaWAN Network Server IP/hostname
- *   - ns_port_up     Uplink UDP port (default 1700)
- *   - ns_port_down   Downlink UDP port (default 1700)
+ *   - ns_port_up     Uplink UDP port (default 1680)
+ *   - ns_port_down   Downlink UDP port (default 1680)
  *   - gateway_eui    64-bit Gateway EUI
  *   - eth_ip/gw/sn   Static Ethernet configuration
  */
@@ -26,12 +26,12 @@ extern "C" {
 /*  Magic & defaults                                                   */
 /* ------------------------------------------------------------------ */
 
-#define CONFIG_MAGIC            0xC0FFEE01U  /* valid config marker */
+#define CONFIG_MAGIC            0xC0FFEE02U  /* v2: port default changed to 1680 */
 
 #define CONFIG_DEFAULT_NS_HOST      "192.168.10.1"
-#define CONFIG_DEFAULT_NS_PORT_UP   1700
-#define CONFIG_DEFAULT_NS_PORT_DOWN 1700
-#define CONFIG_DEFAULT_GW_EUI       0xAA555A0000000000ULL
+#define CONFIG_DEFAULT_NS_PORT_UP   1680
+#define CONFIG_DEFAULT_NS_PORT_DOWN 1680
+#define CONFIG_DEFAULT_GW_EUI       0xAA555A00000021FBULL
 
 /* Defaults are applied from W5500 network config */
 #define CONFIG_DEFAULT_ETH_IP   {192, 168, 10,  15}

@@ -70,6 +70,10 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #define BW_500KHZ       0x06
 #define BW_250KHZ       0x05
 #define BW_125KHZ       0x04
+#define BW_62K5HZ       0x03
+#define BW_31K2HZ       0x02
+#define BW_15K6HZ       0x01
+#define BW_7K8HZ        0x00
 
 /* values available for the 'datarate' parameters */
 /* NOTE: LoRa values used directly to code SF bitmask in 'multi' modem, do not change */

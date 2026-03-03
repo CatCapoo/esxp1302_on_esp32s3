@@ -4,13 +4,129 @@
 
 | 脚本 | 用途 | 依赖 |
 |------|------|------|
-| `scripts/e77_node_tx.py` | E77 节点 ABP 发包 (配合 HAL RX 测试) | pyserial |
-| `scripts/e77_probe.py` | E77 串口诊断探测 | pyserial |
+| `scripts/e77_node_ctrl.py` | **E77 完整控制脚本**（OTAA/ABP 入网 + 周期发包，配合 Packet Forwarder 端到端测试）| pyserial |
+| `scripts/lora_ns_mock.py` | **Mock 网络服务器**（监听 UDP，回复 PUSH_ACK/PULL_ACK，打印上行帧）| — |
+| `scripts/e77_node_tx.py` | E77 节点 ABP 发包（配合 HAL RX 测试，固定 Sub-band 10）| pyserial |
+| `scripts/e77_probe.py` | E77 串口诊断探测（自动扫描波特率）| pyserial |
 
 安装依赖:
 ```powershell
 pip install pyserial
 ```
+
+---
+
+## lora_ns_mock.py — Mock 网络服务器
+
+### 功能
+
+监听指定 UDP 端口，模拟 LoRaWAN Network Server 行为：
+
+- 收到 `PUSH_DATA` → 解析并打印网关 EUI、rxpk 上行帧（频率/SF/RSSI/SNR/hex+b64 payload）、stat 统计字段，回复 `PUSH_ACK`
+- 收到 `PULL_DATA` → 回复 `PULL_ACK`，记录 pull 地址
+- 不实现 LoRaWAN MAC（不能做 OTAA JoinAccept / 下行数据）
+
+### 启动
+
+```powershell
+python scripts/lora_ns_mock.py 1680
+# 或指定其他端口
+python scripts/lora_ns_mock.py 1700
+```
+
+### 输出示例
+
+```
+[INFO] Listening on 0.0.0.0:1680 ...
+
+[2026-03-04 00:48:40.183] ← 192.168.10.15:1680  PUSH_DATA  token=c4af
+  网关 EUI : AA:55:5A:00:00:00:21:FB
+  上行帧数量: 1
+  [rxpk 0]
+    freq: 470.3   modu: LORA   datr: SF10BW125   codr: 4/5
+    rssi: -79     lsnr: 6.8    size: 21
+    data (hex): 40341201260004000223660e49aa300e96cc5b1282
+  → 已回复 PUSH_ACK
+
+[2026-03-04 00:48:41.479] ← 192.168.10.15:1681  PULL_DATA  token=1528
+  网关 EUI : AA:55:5A:00:00:00:21:FB
+  → 已回复 PULL_ACK
+```
+
+---
+
+## e77_node_ctrl.py — E77 完整控制脚本
+
+### 功能
+
+通用 AT 指令控制脚本，支持 OTAA 和 ABP 两种入网方式、周期性发包、参数查询和出厂恢复。
+
+配合 `lora_ns_mock.py`（ABP 验证链路）或 ChirpStack（OTAA 完整流程）使用。
+
+### 子命令
+
+| 子命令 | 说明 |
+|--------|------|
+| `otaa` | OTAA 入网并周期发包 |
+| `abp` | ABP 入网并周期发包 |
+| `query` | 查询模块当前所有参数（不入网） |
+| `send` | 仅发一包（需已入网） |
+| `restore` | 恢复出厂配置（清除历史持久化参数） |
+
+### 命令行参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--port` | (必选) | 串口号，如 `COM17` 或 `/dev/ttyUSB0` |
+| `--baud` | 9600 | 波特率 |
+| `--verbose` | false | 打印所有串口原始收发内容 |
+| `--region` | 2 | 频段 ID（2=CN470，5=EU868，8=US915）|
+| `--adr` | 1 | ADR 0=关 1=开 |
+| `--dr` | None | 固定 DR（ADR=0 时有效），0=SF12 … 5=SF7 |
+| `--txp` | 0 | 发射功率（0=最大 CN470 20dBm）|
+| `--chanmask` | None | 信道掩码（CN470/US915 用）|
+| `--deveui` | — | OTAA: DevEUI（16 hex）|
+| `--appeui` | `0000000000000000` | OTAA: AppEUI |
+| `--appkey` | — | OTAA: AppKey（32 hex）|
+| `--devaddr` | — | ABP: DevAddr（8 hex）|
+| `--nwkskey` | — | ABP: NwkSKey（32 hex）|
+| `--appskey` | — | ABP: AppSKey（32 hex）|
+| `--payload` | `DEADBEEF` | 上行 hex payload |
+| `--port-fwd` | 2 | LoRaWAN FPort |
+| `--ack` | 0 | Confirmed uplink（0=否 1=是）|
+| `--interval` | 30 | 周期发送间隔（秒）|
+| `--count` | 0 | 发送总包数（0=无限）|
+
+### 典型用法
+
+```powershell
+# 查询 E77 出厂 DevEUI 等参数
+python scripts/e77_node_ctrl.py query --port COM17
+
+# 恢复出厂（新测试前必做，避免历史 chanmask/AppKey 干扰）
+python scripts/e77_node_ctrl.py restore --port COM17
+
+# ABP 发包（配合 Mock NS，SubBand1 470.3~471.7 MHz）
+python scripts/e77_node_ctrl.py abp `
+    --port COM17 `
+    --devaddr 26011234 `
+    --nwkskey 00112233445566778899AABBCCDDEEFF `
+    --appskey FFEEDDCCBBAA99887766554433221100 `
+    --chanmask 0001:0000:0000:0000:0000:0000 `
+    --adr 0 --dr 2 --interval 30 --payload DEADBEEF01020304
+
+# OTAA 入网（配合 ChirpStack，CN470-10 SubBand10 486.3~487.7 MHz）
+python scripts/e77_node_ctrl.py otaa `
+    --port COM17 `
+    --deveui AABBCCDD11223344 `
+    --appkey 00112233445566778899AABBCCDDEEFF `
+    --chanmask 0000:0000:0000:0000:0000:00FF `
+    --adr 1 --interval 30 --payload DEADBEEF01020304
+```
+
+> **chanmask 说明**  
+> - SubBand1（本项目网关默认）：`0001:0000:0000:0000:0000:0000`（CH0~7，470.3~471.7 MHz）  
+> - CN470-10（ChirpStack cn470_10 频率计划）：`0000:0000:0000:0000:0000:00FF`（CH80~87，486.3~487.7 MHz）
 
 ---
 
