@@ -7,6 +7,7 @@
 | [03_hal_tx_test.md](03_hal_tx_test.md) | HAL TX 发包测试 — 搭配 SX1278 接收端 |
 | [04_scripts_reference.md](04_scripts_reference.md) | Python 测试脚本完整用法手册 |
 | [05_w5500_udp_test.md](05_w5500_udp_test.md) | W5500 以太网 + UDP 双向通信测试 |
+| [06_flash_config_uart_cli_testing.md](06_flash_config_uart_cli_testing.md) | STM32F407 内部 Flash 配置存储 + UART CLI 环形缓冲（CH340 DTR 复位修复）|
 
 ## 测试顺序
 

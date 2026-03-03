@@ -1,14 +1,16 @@
 /*
  * uart_cli.c  –  UART command-line interface for gateway configuration
  *
- * Receive flow:
+ * Receive flow (ring-buffer architecture):
  *   HAL_UART_Receive_IT() → USART1_IRQHandler (stm32f4xx_it.c)
  *     → HAL_UART_IRQHandler() → HAL_UART_RxCpltCallback()
- *       → accumulate into line buffer, set cli_line_ready flag on newline
- *   uart_cli_task() polls cli_line_ready, copies line, parses, executes.
+ *       → store ONE byte in ring buffer, re-arm immediately.
  *
- * Echo:  Each received character is echoed back so the user can see what
- *        they type. Backspace (0x7F / 0x08) erases the previous character.
+ *   uart_cli_task() (called from FreeRTOS task @ 10ms):
+ *     → drain ring buffer → echo each char → build line buffer
+ *     → when CR/LF received → parse + execute command
+ *
+ *   No blocking calls inside the ISR – prevents character loss.
  */
 
 #include "uart_cli.h"
@@ -22,19 +24,30 @@
 #include <stdlib.h>
 
 /* ------------------------------------------------------------------ */
-/*  Internal buffers                                                   */
+/*  Ring buffer (ISR → task)                                           */
+/* ------------------------------------------------------------------ */
+
+#define RING_SIZE  256                     /* must be power of 2 */
+#define RING_MASK  (RING_SIZE - 1)
+
+static volatile uint8_t  s_ring[RING_SIZE];
+static volatile uint8_t  s_ring_head;      /* written by ISR only */
+static volatile uint8_t  s_ring_tail;      /* read by task only  */
+
+static volatile uint8_t  s_rx_byte;        /* HAL single-byte target */
+
+/* ------------------------------------------------------------------ */
+/*  Line buffer (task only – not volatile)                             */
 /* ------------------------------------------------------------------ */
 
 #define CLI_LINE_MAX  256
 #define CLI_ARGS_MAX    8
 
-static volatile uint8_t  s_rx_byte;
-static volatile char     s_rx_line[CLI_LINE_MAX];
-static volatile uint16_t s_rx_pos;
-static volatile uint8_t  s_line_ready;
+static char     s_line[CLI_LINE_MAX];
+static uint16_t s_line_pos;
 
 /* ------------------------------------------------------------------ */
-/*  IRQ / HAL callback                                                 */
+/*  ISR callback – absolute minimum work                               */
 /* ------------------------------------------------------------------ */
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
@@ -43,34 +56,19 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         return;
     }
 
+    /* 1. Snapshot the byte */
     uint8_t c = s_rx_byte;
 
-    /* Echo back */
-    HAL_UART_Transmit(&huart1, &c, 1, 10);
-
-    if (c == '\r' || c == '\n') {
-        /* CR or LF ends the line */
-        if (s_rx_pos > 0 && !s_line_ready) {
-            s_rx_line[s_rx_pos] = '\0';
-            s_line_ready = 1;
-            s_rx_pos     = 0;
-        }
-        uint8_t nl = '\n';
-        HAL_UART_Transmit(&huart1, &nl, 1, 10);
-    } else if (c == 0x7F || c == 0x08) {
-        /* Backspace / DEL – erase last char */
-        if (s_rx_pos > 0) {
-            s_rx_pos--;
-            /* Send VT100 erase-char sequence */
-            const uint8_t bs[] = {0x08, ' ', 0x08};
-            HAL_UART_Transmit(&huart1, (uint8_t *)bs, 3, 10);
-        }
-    } else if (s_rx_pos < CLI_LINE_MAX - 1) {
-        s_rx_line[s_rx_pos++] = (char)c;
-    }
-
-    /* Re-arm for next byte */
+    /* 2. Re-arm FIRST – ready for the very next byte */
     HAL_UART_Receive_IT(&huart1, (uint8_t *)&s_rx_byte, 1);
+
+    /* 3. Push into ring buffer (no blocking, no echo!) */
+    uint8_t next = (s_ring_head + 1) & RING_MASK;
+    if (next != s_ring_tail) {          /* not full */
+        s_ring[s_ring_head] = c;
+        s_ring_head = next;
+    }
+    /* That's it – task handles echo + line building */
 }
 
 /* ------------------------------------------------------------------ */
@@ -265,8 +263,9 @@ static void dispatch_line(char *line)
 
 void uart_cli_init(void)
 {
-    s_rx_pos    = 0;
-    s_line_ready = 0;
+    s_ring_head = 0;
+    s_ring_tail = 0;
+    s_line_pos  = 0;
 
     /* Enable USART1 interrupt in NVIC with a lower priority than SysTick */
     HAL_NVIC_SetPriority(USART1_IRQn, 5, 0);
@@ -280,18 +279,34 @@ void uart_cli_init(void)
 
 void uart_cli_task(void)
 {
-    if (!s_line_ready) {
-        return;
+    /* --- Drain ring buffer: echo + line accumulation --- */
+    while (s_ring_tail != s_ring_head) {
+        uint8_t c = s_ring[s_ring_tail];
+        s_ring_tail = (s_ring_tail + 1) & RING_MASK;
+
+        if (c == '\r' || c == '\n') {
+            /* Echo newline */
+            uint8_t crlf[] = {'\r', '\n'};
+            HAL_UART_Transmit(&huart1, crlf, 2, 10);
+
+            if (s_line_pos > 0) {
+                s_line[s_line_pos] = '\0';
+                s_line_pos = 0;
+
+                dispatch_line(s_line);
+                printf("> ");
+            }
+        } else if (c == 0x7F || c == 0x08) {
+            /* Backspace */
+            if (s_line_pos > 0) {
+                s_line_pos--;
+                const uint8_t bs[] = {0x08, ' ', 0x08};
+                HAL_UART_Transmit(&huart1, (uint8_t *)bs, 3, 10);
+            }
+        } else if (s_line_pos < CLI_LINE_MAX - 1) {
+            s_line[s_line_pos++] = (char)c;
+            /* Echo printable char */
+            HAL_UART_Transmit(&huart1, &c, 1, 10);
+        }
     }
-
-    /* Snapshot and clear before processing (allow new input while parsing) */
-    char line_copy[CLI_LINE_MAX];
-    strncpy(line_copy, (const char *)s_rx_line, CLI_LINE_MAX - 1);
-    line_copy[CLI_LINE_MAX - 1] = '\0';
-    s_line_ready = 0;
-
-    dispatch_line(line_copy);
-
-    /* Re-prompt */
-    printf("> ");
 }

@@ -163,7 +163,9 @@ void config_print(void)
     printf("  ns_host       : %s\r\n", s_config.ns_host);
     printf("  ns_port_up    : %u\r\n", (unsigned)s_config.ns_port_up);
     printf("  ns_port_down  : %u\r\n", (unsigned)s_config.ns_port_down);
-    printf("  gateway_eui   : %016llX\r\n", (unsigned long long)s_config.gateway_eui);
+    printf("  gateway_eui   : %08X%08X\r\n",
+           (unsigned)((s_config.gateway_eui >> 32) & 0xFFFFFFFFUL),
+           (unsigned)(s_config.gateway_eui & 0xFFFFFFFFUL));
     printf("  eth_ip        : %u.%u.%u.%u\r\n",
            s_config.eth_ip[0], s_config.eth_ip[1],
            s_config.eth_ip[2], s_config.eth_ip[3]);
