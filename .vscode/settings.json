@@ -5,8 +5,8 @@
     "*.h": "c",
     "*.c": "c"
   },
-  "C_Cpp_Runner.cCompilerPath": "gcc",
-  "C_Cpp_Runner.cppCompilerPath": "g++",
+  "C_Cpp_Runner.cCompilerPath": "/opt/st/stm32cubeclt_1.21.0/GNU-tools-for-STM32/bin/arm-none-eabi-gcc",
+  "C_Cpp_Runner.cppCompilerPath": "/opt/st/stm32cubeclt_1.21.0/GNU-tools-for-STM32/bin/arm-none-eabi-g++",
   "C_Cpp_Runner.debuggerPath": "gdb",
   "C_Cpp_Runner.cStandard": "",
   "C_Cpp_Runner.cppStandard": "",
@@ -61,5 +61,14 @@
   "C_Cpp_Runner.useLeakSanitizer": false,
   "C_Cpp_Runner.showCompilationTime": false,
   "C_Cpp_Runner.useLinkTimeOptimization": false,
-  "C_Cpp_Runner.msvcSecureNoWarnings": false
+  "C_Cpp_Runner.msvcSecureNoWarnings": false,
+  "cmake.cmakePath": "/opt/st/stm32cubeclt_1.21.0/CMake/bin/cmake",
+  "cmake.executable": "/opt/st/stm32cubeclt_1.21.0/CMake/bin/cmake",
+  // ── 跨平台工具链路径（由 install_toolchain.sh 自动写入） ──────────────────
+  // 修改此值即可切换 STM32CubeCLT 版本，无需修改 launch.json
+  "stm32.cltPath": "/opt/st/stm32cubeclt_1.21.0",
+  // Cortex-Debug 全局工具链默认值（launch.json 中不再重复写路径）
+  "cortex-debug.armToolchainPath": "/opt/st/stm32cubeclt_1.21.0/GNU-tools-for-STM32/bin",
+  "cortex-debug.gdbPath": "/opt/st/stm32cubeclt_1.21.0/GNU-tools-for-STM32/bin/arm-none-eabi-gdb",
+  "idf.currentSetup": "/home/cuckooshan/esp/v5.4.3/esp-idf"
 }
