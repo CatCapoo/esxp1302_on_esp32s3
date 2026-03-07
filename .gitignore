@@ -2,6 +2,9 @@
 build/
 main/
 
+# STM32 build output
+esxp1302_stm32f407/build/
+
 # CubeMX IDE backup files
 .cproject.bak
 .project.bak

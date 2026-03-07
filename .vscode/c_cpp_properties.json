@@ -7,11 +7,12 @@
       ],
       "compilerPath": "C:/mingw64/bin/gcc.exe",
       "cStandard": "${default}",
-      "cppStandard": "${default}",
       "intelliSenseMode": "windows-gcc-x64",
-      "compilerArgs": [
-        ""
-      ]
+      "defines": [
+        "STM32F407xx",
+        "USE_HAL_DRIVER"
+      ],
+      "cppStandard": "${default}"
     }
   ],
   "version": 4

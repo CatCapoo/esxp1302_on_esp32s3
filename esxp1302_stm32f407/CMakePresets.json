@@ -8,7 +8,7 @@
             "binaryDir": "${sourceDir}/build/${presetName}",
 		    "toolchainFile": "${sourceDir}/cmake/gcc-arm-none-eabi.cmake",
             "environment": {
-                "PATH": "C:/ST/STM32CubeCLT_1.21.0/GNU-tools-for-STM32/bin;C:/ST/STM32CubeCLT_1.21.0/CMake/bin;$penv{PATH}"
+                "PATH": "$env{STM32_CLT_PATH}/GNU-tools-for-STM32/bin;$env{STM32_CLT_PATH}/CMake/bin;$penv{PATH}"
             },
             "cacheVariables": {
             }

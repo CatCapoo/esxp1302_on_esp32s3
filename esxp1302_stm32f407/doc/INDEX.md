@@ -15,6 +15,7 @@
 |------|------|------|
 | 1 | [hardware/01_hardware_overview.md](hardware/01_hardware_overview.md) | 硬件平台、接线、引脚映射 |
 | 2 | [impl/01_cmake_setup.md](impl/01_cmake_setup.md) | CubeMX 工程 + CMake + VS Code 搭建 |
+| 2.1 | [impl/05_cross_platform_config.md](impl/05_cross_platform_config.md) | 跨平台构建配置（STM32_CLT_PATH） |
 | 3 | [impl/02_platform_adapt.md](impl/02_platform_adapt.md) | 所有 ESP32→STM32 适配改动 |
 | 4 | [impl/03_driver_layers.md](impl/03_driver_layers.md) | 驱动层文件清单与依赖关系 |
 | 5 | [testing/01_bringup_tests.md](testing/01_bringup_tests.md) | SPI/SX1250/REG/OLED/LM75A 五项测试 |
@@ -31,6 +32,7 @@
 
 ### 工程搭建 / 代码适配
 - [impl/01_cmake_setup.md](impl/01_cmake_setup.md) — CMake + Ninja + CubeMX
+- [impl/05_cross_platform_config.md](impl/05_cross_platform_config.md) — 跨平台构建配置（STM32_CLT_PATH 环境变量方案）
 - [impl/02_platform_adapt.md](impl/02_platform_adapt.md) — 平台适配速查表
 - [impl/03_driver_layers.md](impl/03_driver_layers.md) — 源文件依赖关系
 

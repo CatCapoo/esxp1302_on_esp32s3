@@ -46,6 +46,18 @@
             "dependsOn": ["Clean", "Build"],
             "group": "build",
             "problemMatcher": []
+        },
+        {
+            "label": "Flash (STM32CubeProgrammer)",
+            "type": "shell",
+            "command": "${env:STM32_CLT_PATH}/STM32CubeProgrammer/bin/STM32_Programmer_CLI",
+            "args": [
+                "--connect", "port=SWD",
+                "--download", "${workspaceFolder}/esxp1302_stm32f407/build/Debug/esxp1302_stm32f407.elf",
+                "--start"
+            ],
+            "group": "build",
+            "problemMatcher": []
         }
     ]
 }
