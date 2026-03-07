@@ -10,6 +10,7 @@
  */
 
 #include "gateway_config.h"
+#include "gw_config_presets.h"
 
 #include "stm32f4xx_hal.h"
 #include <string.h>
@@ -69,6 +70,11 @@ static void apply_defaults(gateway_config_t *cfg)
     memcpy(cfg->eth_ip, ip, 4);
     memcpy(cfg->eth_gw, gw, 4);
     memcpy(cfg->eth_sn, sn, 4);
+
+    cfg->freq_region  = (uint8_t)CONFIG_DEFAULT_FREQ_REGION;
+    cfg->radio0_freq  = CONFIG_DEFAULT_RADIO0_FREQ;
+    cfg->radio1_freq  = CONFIG_DEFAULT_RADIO1_FREQ;
+    cfg->_pad[0] = 0; cfg->_pad[1] = 0; cfg->_pad[2] = 0;
 
     cfg->checksum = checksum_compute(cfg);
 }
@@ -133,8 +139,18 @@ void config_load(void)
         memcpy(&s_config, flash, sizeof(s_config));
         printf("[CFG] Loaded from Flash (valid).\r\n");
     } else {
-        printf("[CFG] Flash empty/invalid – using defaults.\r\n");
+        /* Print diagnostic reason for rejection */
+        if (flash->magic != CONFIG_MAGIC) {
+            printf("[CFG] Flash magic mismatch: found 0x%08X, expected 0x%08X\r\n",
+                   (unsigned)flash->magic, (unsigned)CONFIG_MAGIC);
+            printf("[CFG] (firmware update changed config layout; defaults will be applied)\r\n");
+        } else {
+            uint32_t expected = checksum_compute(flash);
+            printf("[CFG] Flash checksum mismatch: stored 0x%08X, computed 0x%08X\r\n",
+                   (unsigned)flash->checksum, (unsigned)expected);
+        }
         apply_defaults(&s_config);
+        printf("[CFG] Using compile-time defaults.\r\n");
     }
 }
 
@@ -143,10 +159,23 @@ void config_save(void)
     s_config.checksum = checksum_compute(&s_config);
 
     HAL_StatusTypeDef st = flash_write(&s_config);
-    if (st == HAL_OK) {
-        printf("[CFG] Saved to Flash OK.\r\n");
-    } else {
+    if (st != HAL_OK) {
         printf("[CFG] Save FAILED (HAL error %d).\r\n", (int)st);
+        return;
+    }
+
+    /* Read-back verify: ensure Flash matches RAM */
+    const gateway_config_t *flash = (const gateway_config_t *)CONFIG_FLASH_ADDR;
+    if (flash->magic == s_config.magic &&
+        flash->checksum == s_config.checksum &&
+        memcmp(flash->ns_host, s_config.ns_host, sizeof(s_config.ns_host)) == 0) {
+        printf("[CFG] Saved to Flash OK (verified).\r\n");
+    } else {
+        printf("[CFG] WARNING: Flash read-back mismatch!\r\n");
+        printf("[CFG]   RAM magic=0x%08X checksum=0x%08X\r\n",
+               (unsigned)s_config.magic, (unsigned)s_config.checksum);
+        printf("[CFG]   Flash magic=0x%08X checksum=0x%08X\r\n",
+               (unsigned)flash->magic, (unsigned)flash->checksum);
     }
 }
 
@@ -175,6 +204,22 @@ void config_print(void)
     printf("  eth_sn        : %u.%u.%u.%u\r\n",
            s_config.eth_sn[0], s_config.eth_sn[1],
            s_config.eth_sn[2], s_config.eth_sn[3]);
+    /* Frequency plan */
+    const gw_freq_preset_t *preset = gw_preset_get((freq_region_t)s_config.freq_region);
+    if (preset) {
+        printf("  freq_region   : %u (%s)\r\n",
+               (unsigned)s_config.freq_region, preset->name);
+        printf("  radio0_freq   : %lu Hz  [preset: %lu Hz]\r\n",
+               (unsigned long)s_config.radio0_freq,
+               (unsigned long)preset->radio0_freq);
+        printf("  radio1_freq   : %lu Hz  [preset: %lu Hz]\r\n",
+               (unsigned long)s_config.radio1_freq,
+               (unsigned long)preset->radio1_freq);
+    } else {
+        printf("  freq_region   : %u (custom)\r\n", (unsigned)s_config.freq_region);
+        printf("  radio0_freq   : %lu Hz\r\n", (unsigned long)s_config.radio0_freq);
+        printf("  radio1_freq   : %lu Hz\r\n", (unsigned long)s_config.radio1_freq);
+    }
     printf("  checksum      : 0x%08X\r\n", (unsigned)s_config.checksum);
     printf("-----------------------------\r\n");
 }

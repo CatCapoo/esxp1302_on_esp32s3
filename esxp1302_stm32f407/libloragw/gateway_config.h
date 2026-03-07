@@ -18,25 +18,39 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "gw_config_presets.h"
+#include "gateway_defaults.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* ------------------------------------------------------------------ */
-/*  Magic & defaults                                                   */
+/*  Magic                                                              */
 /* ------------------------------------------------------------------ */
 
-#define CONFIG_MAGIC            0xC0FFEE02U  /* v2: port default changed to 1680 */
+/* Bump CONFIG_MAGIC when gateway_config_t layout changes.
+ * v3: added freq_region, radio0_freq, radio1_freq fields.
+ * v4: CN470 expanded from 8 to 12 sub-bands; EU868/US915/AU915/AS923
+ *     enum values shifted (+4).  Old v3 Flash data will be rejected. */
+#define CONFIG_MAGIC            0xC0FFEE04U
 
-#define CONFIG_DEFAULT_NS_HOST      "192.168.10.1"
-#define CONFIG_DEFAULT_NS_PORT_UP   1680
-#define CONFIG_DEFAULT_NS_PORT_DOWN 1680
-#define CONFIG_DEFAULT_GW_EUI       0xAA555A00000021FBULL
+/* ------------------------------------------------------------------ */
+/*  Compile-time defaults  (see gateway_defaults.h to change them)    */
+/* ------------------------------------------------------------------ */
 
-/* Defaults are applied from W5500 network config */
-#define CONFIG_DEFAULT_ETH_IP   {192, 168, 10,  15}
-#define CONFIG_DEFAULT_ETH_GW   {192, 168, 10,   1}
-#define CONFIG_DEFAULT_ETH_SN   {255, 255, 255,  0}
+#define CONFIG_DEFAULT_NS_HOST      GW_DEFAULT_NS_HOST
+#define CONFIG_DEFAULT_NS_PORT_UP   GW_DEFAULT_NS_PORT_UP
+#define CONFIG_DEFAULT_NS_PORT_DOWN GW_DEFAULT_NS_PORT_DOWN
+#define CONFIG_DEFAULT_GW_EUI       GW_DEFAULT_EUI
+
+#define CONFIG_DEFAULT_ETH_IP       GW_DEFAULT_ETH_IP
+#define CONFIG_DEFAULT_ETH_GW       GW_DEFAULT_ETH_GW
+#define CONFIG_DEFAULT_ETH_SN       GW_DEFAULT_ETH_SN
+
+#define CONFIG_DEFAULT_FREQ_REGION  GW_DEFAULT_FREQ_REGION
+#define CONFIG_DEFAULT_RADIO0_FREQ  GW_DEFAULT_RADIO0_FREQ
+#define CONFIG_DEFAULT_RADIO1_FREQ  GW_DEFAULT_RADIO1_FREQ
 
 /* ------------------------------------------------------------------ */
 /*  Config struct                                                      */
@@ -51,6 +65,12 @@ typedef struct {
     uint8_t  eth_ip[4];          /* Static Ethernet IP                     */
     uint8_t  eth_gw[4];          /* Ethernet default gateway               */
     uint8_t  eth_sn[4];          /* Ethernet subnet mask                   */
+    /* Frequency plan (added in v3) ----------------------------------- */
+    uint32_t radio0_freq;        /* SX1302 radio_0 center freq, Hz         */
+    uint32_t radio1_freq;        /* SX1302 radio_1 center freq, Hz         */
+    uint8_t  freq_region;        /* freq_region_t enum value               */
+    uint8_t  _pad[3];            /* reserved, must be 0                    */
+    /* ---------------------------------------------------------------- */
     uint32_t checksum;           /* 32-bit sum of all preceding bytes      */
 } gateway_config_t;
 

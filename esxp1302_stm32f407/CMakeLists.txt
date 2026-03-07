@@ -60,6 +60,7 @@ set(LORAGW_SOURCES
     libloragw/sx1250_spi.c
     libloragw/sx1250_com.c
     libloragw/gateway_config.c
+    libloragw/gw_config_presets.c
     libloragw/uart_cli.c
     libtools/tinymt32.c
 )

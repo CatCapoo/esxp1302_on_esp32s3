@@ -15,6 +15,7 @@
 
 #include "uart_cli.h"
 #include "gateway_config.h"
+#include "gw_config_presets.h"
 
 #include "stm32f4xx_hal.h"
 #include "usart.h"
@@ -87,10 +88,14 @@ static void cli_print_help(void)
     printf("  config set eth_ip   <a.b.c.d>\r\n");
     printf("  config set eth_gw   <a.b.c.d>\r\n");
     printf("  config set eth_sn   <a.b.c.d>\r\n");
+    printf("  config set freq_region <name>  e.g. CN470_10, EU868, US915\r\n");
+    printf("  config set radio0_freq <Hz>    (manual override, sets region=custom)\r\n");
+    printf("  config set radio1_freq <Hz>    (manual override, sets region=custom)\r\n");
     printf("  config save\r\n");
     printf("  config load\r\n");
     printf("  config reset\r\n");
     printf("  reboot\r\n");
+    printf("  region list   (show all frequency plan presets)\r\n");
     printf("===================\r\n");
 }
 
@@ -193,6 +198,43 @@ static void cmd_config_set(int argc, char *argv[])
                cfg->eth_sn[0], cfg->eth_sn[1],
                cfg->eth_sn[2], cfg->eth_sn[3]);
 
+    } else if (strcmp(key, "freq_region") == 0) {
+        freq_region_t region = gw_preset_find_by_name(val);
+        if (region == FREQ_REGION_CUSTOM) {
+            printf("[CLI] Unknown region '%s'. Use 'region list' to see options.\r\n", val);
+            return;
+        }
+        const gw_freq_preset_t *p = gw_preset_get(region);
+        cfg->freq_region  = (uint8_t)region;
+        cfg->radio0_freq  = p->radio0_freq;
+        cfg->radio1_freq  = p->radio1_freq;
+        printf("[CLI] freq_region = %u (%s)\r\n", (unsigned)region, p->name);
+        printf("[CLI]   radio0_freq = %lu Hz\r\n", (unsigned long)p->radio0_freq);
+        printf("[CLI]   radio1_freq = %lu Hz\r\n", (unsigned long)p->radio1_freq);
+        printf("[CLI] ** Run 'config save' then 'reboot' to apply **\r\n");
+
+    } else if (strcmp(key, "radio0_freq") == 0) {
+        long freq = atol(val);
+        if (freq <= 0) {
+            printf("[CLI] Invalid frequency: %s\r\n", val);
+            return;
+        }
+        cfg->radio0_freq = (uint32_t)freq;
+        cfg->freq_region = (uint8_t)FREQ_REGION_CUSTOM;
+        printf("[CLI] radio0_freq = %lu Hz (region set to custom)\r\n",
+               (unsigned long)cfg->radio0_freq);
+
+    } else if (strcmp(key, "radio1_freq") == 0) {
+        long freq = atol(val);
+        if (freq <= 0) {
+            printf("[CLI] Invalid frequency: %s\r\n", val);
+            return;
+        }
+        cfg->radio1_freq = (uint32_t)freq;
+        cfg->freq_region = (uint8_t)FREQ_REGION_CUSTOM;
+        printf("[CLI] radio1_freq = %lu Hz (region set to custom)\r\n",
+               (unsigned long)cfg->radio1_freq);
+
     } else {
         printf("[CLI] Unknown key: %s\r\n", key);
     }
@@ -246,6 +288,24 @@ static void dispatch_line(char *line)
         } else {
             printf("[CLI] Unknown config sub-command: %s\r\n", argv[1]);
         }
+
+    } else if (strcmp(argv[0], "region") == 0) {
+        /* region list */
+        printf("Frequency plan presets (CLI name = ChirpStack region):\r\n");
+        printf("  %-4s  %-10s  %-11s  %-11s  %s\r\n",
+               "Idx", "Name", "radio0 MHz", "radio1 MHz", "Description");
+        for (int i = 0; i < GW_FREQ_PRESET_COUNT; i++) {
+            const gw_freq_preset_t *p = &gw_freq_presets[i];
+            printf("  %-4d  %-10s  %-11.1f  %-11.1f  %s\r\n",
+                   (int)p->region,
+                   p->name,
+                   (double)p->radio0_freq / 1e6,
+                   (double)p->radio1_freq / 1e6,
+                   p->description);
+        }
+        printf("  %-4d  %-10s  %-11s  %-11s  %s\r\n",
+               (int)FREQ_REGION_CUSTOM, "custom", "-", "-",
+               "Manual radio0_freq/radio1_freq");
 
     } else if (strcmp(argv[0], "reboot") == 0) {
         printf("[CLI] Rebooting...\r\n");

@@ -26,12 +26,16 @@ _estack = ORIGIN(RAM) + LENGTH(RAM);    /* end of RAM */
 _Min_Heap_Size = 0x200;      /* required amount of heap  */
 _Min_Stack_Size = 0x400; /* required amount of stack */
 
-/* Specify the memory areas */
+/* Specify the memory areas.
+ * FLASH limited to 896K (0xE0000) = Sectors 0-10.
+ * Sector 11 (0x080E0000, 128K) is reserved for gateway config storage
+ * (see gateway_config.c). Using LENGTH = 1024K would risk the linker
+ * placing code/data into the config sector. */
 MEMORY
 {
 RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 128K
 CCMRAM (xrw)      : ORIGIN = 0x10000000, LENGTH = 64K
-FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 1024K
+FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 896K
 }
 
 /* Define output sections */
