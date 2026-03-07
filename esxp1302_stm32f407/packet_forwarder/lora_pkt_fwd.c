@@ -69,6 +69,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 /* Flash-based config (replaces ESP32 NVS) */
 #include "gateway_config.h"
 #include "uart_cli.h"
+#include "gw_config_presets.h"
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                   */
@@ -586,6 +587,19 @@ static int parse_SX130x_configuration(const char * conf_array) {
             MSG("INFO: radio %i disabled\n", i);
         } else {
             rfconf.freq_hz = (unsigned int)json_object_get_number(conf_obj, "freq");
+            /* Apply Flash freq override (radio0_freq / radio1_freq != 0 means override) */
+            {
+                const gateway_config_t *_fcfg = config_get();
+                if (i == 0 && _fcfg->radio0_freq != 0) {
+                    MSG("INFO: radio 0 freq overridden by Flash config: %u -> %lu\n",
+                        rfconf.freq_hz, (unsigned long)_fcfg->radio0_freq);
+                    rfconf.freq_hz = (unsigned int)_fcfg->radio0_freq;
+                } else if (i == 1 && _fcfg->radio1_freq != 0) {
+                    MSG("INFO: radio 1 freq overridden by Flash config: %u -> %lu\n",
+                        rfconf.freq_hz, (unsigned long)_fcfg->radio1_freq);
+                    rfconf.freq_hz = (unsigned int)_fcfg->radio1_freq;
+                }
+            }
             MSG("INFO: radio %i enabled, center frequency %u\n", i, rfconf.freq_hz);
         }
 
@@ -2052,7 +2066,7 @@ int pkt_fwd_main(void)
     /* statistics */
     float rx_ok_ratio, rx_bad_ratio, rx_nocrc_ratio;
     float up_ack_ratio, dw_ack_ratio;
-    char stat_timestamp[24];
+    char stat_timestamp[32];
     unsigned int time_count = 0;
 
     /* GPS placeholder */
@@ -2098,15 +2112,43 @@ int pkt_fwd_main(void)
 
     /* ============== Load JSON Configuration ============== */
 
-    /* Default to CN470 config (hardcoded in global_json.h).
-     * global_cn_conf is a Semtech binary-with-header format:
+    /* Select the embedded JSON config based on the Flash freq_region setting.
+     * All arrays use the Semtech binary-with-header format:
      *   bytes 0-1: big-endian uint16 JSON length
      *   bytes 2..(2+len-1): JSON text
-     * Parson's json_parse_array_with_comments / copy_array() handles this
-     * format natively, so pass the raw array directly — no malloc needed. */
-    MSG("INFO: Loading CN470 default config (free heap %u)...\n",
-        (unsigned)xPortGetFreeHeapSize());
-    const char *conf_array = (const char *)global_cn_conf;
+     *   byte 2+len: NUL terminator
+     * Parson's json_parse_array_with_comments() handles this natively. */
+    {
+        gateway_config_t *_fcfg = config_get();
+        freq_region_t _region = (freq_region_t)_fcfg->freq_region;
+
+        if (_region == FREQ_REGION_EU868) {
+            MSG("INFO: Loading EU868 config (region=%u, free heap %u)...\n",
+                (unsigned)_region, (unsigned)xPortGetFreeHeapSize());
+        } else if (_region == FREQ_REGION_US915_SB0) {
+            MSG("INFO: Loading US915 config (region=%u, free heap %u)...\n",
+                (unsigned)_region, (unsigned)xPortGetFreeHeapSize());
+        } else {
+            /* CN470 sub-bands and CUSTOM all use the CN470 base JSON;
+             * the actual radio center frequencies are overridden below. */
+            MSG("INFO: Loading CN470 default config (region=%u, free heap %u)...\n",
+                (unsigned)_region, (unsigned)xPortGetFreeHeapSize());
+        }
+    }
+
+    const char *conf_array;
+    {
+        gateway_config_t *_fcfg = config_get();
+        freq_region_t _region = (freq_region_t)_fcfg->freq_region;
+
+        if (_region == FREQ_REGION_EU868) {
+            conf_array = (const char *)global_eu_conf;
+        } else if (_region == FREQ_REGION_US915_SB0) {
+            conf_array = (const char *)global_us_conf;
+        } else {
+            conf_array = (const char *)global_cn_conf;
+        }
+    }
 
     /* parse concentrator, gateway, debug configuration */
     x = parse_SX130x_configuration(conf_array);
@@ -2403,7 +2445,7 @@ int pkt_fwd_main(void)
         /* generate JSON status report */
         xSemaphoreTake(mx_stat_rep, portMAX_DELAY);
         up = get_uptime_sec();
-        snprintf(stat_timestamp, sizeof stat_timestamp, "%02lu:%02lu:%02lu",
+        snprintf(stat_timestamp, sizeof stat_timestamp, "2000-01-01 %02lu:%02lu:%02lu GMT",
                  (unsigned long)(up / 3600), (unsigned long)((up % 3600) / 60), (unsigned long)(up % 60));
         if (gps_fake_enable == true) {
             snprintf(status_report, STATUS_SIZE,
@@ -2438,3 +2480,4 @@ int pkt_fwd_main(void)
     MSG("INFO: Exiting packet forwarder\n");
     return 0;
 }
+
