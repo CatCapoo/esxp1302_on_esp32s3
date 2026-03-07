@@ -1,42 +1,46 @@
-# BUG-008锛欵SP32-S3 鏃犳晥 GPIO 寮曡剼榛樿鍊煎鑷磋繍琛屾椂閿欒
+# BUG-008：ESP32-S3 无效 GPIO 引脚默认值导致运行时错误
 
-- **鏃ユ湡**锛?026-02-20  
-- **鏂囦欢**锛歚main/libloragw/loragw_i2c.h`銆乣main/packet_forwarder/lora_pkt_fwd.c`銆乣main/board_config.h`锛堟柊寤猴級  
-- **涓ラ噸绾у埆**锛氳繍琛屾椂鑷村懡锛圛2C / GPIO 鍒濆鍖栧け璐ワ級
+- **日期**：2026-02-20  
+- **文件**：`main/libloragw/loragw_i2c.h`、`main/packet_forwarder/lora_pkt_fwd.c`、`main/board_config.h`（新建）  
+- **严重级别**：运行时致命（I2C / GPIO 初始化失败）
 
 ---
 
-## 鐜拌薄
+## 现象
 
-鍥轰欢鐑у綍鍚庝覆鍙ｈ緭鍑哄涓繍琛屾椂閿欒锛?
+固件烧录后串口输出多个运行时错误：
+
 ```
 E (xxx) i2c: i2c_set_pin(xxx): invalid GPIO number
 E (xxx) gpio: gpio_set_direction(308): GPIO number error
 E (xxx) gpio: gpio_pullup_en(78): GPIO number error
 ```
 
-璁惧闅忓悗鏃犳硶鍚姩 packet forwarder銆?
+设备随后无法启动 packet forwarder。
+
 ---
 
-## 鏍规湰鍘熷洜
+## 根本原因
 
-浠ｇ爜涓悇妯″潡鐨?GPIO 寮曡剼榛樿鍊兼部鐢ㄨ嚜鍘熷 Linux / ESP32锛圕lassic锛夌Щ妞嶇増鏈細
+代码中各模块的 GPIO 引脚默认值沿用自原始 Linux / ESP32（Classic）移植版本：
 
-| 妯″潡 | 榛樿寮曡剼 | ESP32-S3 瀛樺湪锛?|
+| 模块 | 默认引脚 | ESP32-S3 存在？ |
 |------|----------|----------------|
-| I2C SCL | GPIO 22 | 鉂?涓嶅瓨鍦紙ESP32-S3 GPIO 鑼冨洿 0鈥?1 + 26鈥?8锛?*涓嶅惈 22鈥?5**锛?|
-| I2C SDA | GPIO 21 | 鉁咃紙鎭板ソ鏈夋晥锛屼絾寮曡剼琚?SPI Flash 澶嶇敤锛屼笉瀹滀娇鐢級 |
-| USER_BUTTON_1 | GPIO 23 | 鉂?涓嶅瓨鍦?|
-| USER_BUTTON_2 | GPIO 25 | 鉂?涓嶅瓨鍦?|
+| I2C SCL | GPIO 22 | ❌ 不存在（ESP32-S3 GPIO 范围 0–21 + 26–48，**不含 22–25**） |
+| I2C SDA | GPIO 21 | ✅（恰好有效，但引脚被 SPI Flash 复用，不宜使用） |
+| USER_BUTTON_1 | GPIO 23 | ❌ 不存在 |
+| USER_BUTTON_2 | GPIO 25 | ❌ 不存在 |
 
-`gpio_set_direction(308)` 涓殑 308 鏄?`GPIO_NUM_23`锛堟灇涓惧€?= 23锛屼絾妗嗘灦鍐呴儴妫€楠屾椂鏁板€间笉鍖归厤锛夛紝`gpio_pullup_en(78)` 鍚岀悊銆?
+`gpio_set_direction(308)` 中的 308 是 `GPIO_NUM_23`（枚举值 = 23，但框架内部检验时数值不匹配），`gpio_pullup_en(78)` 同理。
+
 ---
 
-## 淇
+## 修复
 
-### 1. 鏂板 `main/board_config.h`
+### 1. 新增 `main/board_config.h`
 
-灏嗗叏閮ㄧ‖浠跺紩鑴氬畾涔夐泦涓埌涓€涓枃浠讹紝鏂逛究閽堝涓嶅悓鏉垮崱淇敼锛?
+将全部硬件引脚定义集中到一个文件，方便针对不同板卡修改：
+
 ```c
 #define I2C_MASTER_SDA_IO   4
 #define I2C_MASTER_SCL_IO   5
@@ -44,13 +48,15 @@ E (xxx) gpio: gpio_pullup_en(78): GPIO number error
 #define BLINK_GPIO          1
 #define LED_GREEN_GPIO      7
 #define USER_BUTTON_1       0    /* IO0: boot/config button */
-#define USER_BUTTON_2       6    /* IO6: reserved (GPIO_NUM_NC 绛夋晥) */
+#define USER_BUTTON_2       6    /* IO6: reserved (GPIO_NUM_NC 等效) */
 ```
 
-鎵€鏈夌浉鍏虫ā鍧楀ご鏂囦欢锛坄loragw_i2c.h`銆乣loragw_gpio.h`銆乣loragw_spi.h`銆乣loragw_gps.h`銆乣led_indication.h`锛夊強 `lora_pkt_fwd.c` 鍧?`#include "board_config.h"`锛屼笉鍐嶅悇鑷‖缂栫爜寮曡剼鍙枫€?
-### 2. GPIO_NUM_NC 淇濇姢
+所有相关模块头文件（`loragw_i2c.h`、`loragw_gpio.h`、`loragw_spi.h`、`loragw_gps.h`、`led_indication.h`）及 `lora_pkt_fwd.c` 均 `#include "board_config.h"`，不再各自硬编码引脚号。
 
-瀵逛簬璁捐涓婁笉杩炴帴鐨勬寜閿紩鑴氾紝鍦ㄥ垵濮嬪寲鍓嶅姞 NC 鍒ゆ柇锛?
+### 2. GPIO_NUM_NC 保护
+
+对于设计上不连接的按键引脚，在初始化前加 NC 判断：
+
 ```c
 if (USER_BUTTON_1 != GPIO_NUM_NC) {
     gpio_set_direction(USER_BUTTON_1, GPIO_MODE_INPUT);
@@ -60,6 +66,6 @@ if (USER_BUTTON_1 != GPIO_NUM_NC) {
 
 ---
 
-## 楠岃瘉
+## 验证
 
-淇鍚庡浐浠跺惎鍔ㄦ棤 GPIO 鐩稿叧閿欒锛孖2C OLED 鍒濆鍖栭€氳繃锛孲X1302 姝ｅ父澶嶄綅骞跺惎鍔ㄣ€?
+修复后固件启动无 GPIO 相关错误，I2C OLED 初始化通过，SX1302 正常复位并启动。

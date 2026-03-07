@@ -1,35 +1,42 @@
-# BUG-007锛歸ebpage.h 鍦?ESP-IDF 鏋勫缓涓笉浼氳嚜鍔ㄧ敓鎴?
-- **鏃ユ湡**锛?026-02-20  
-- **鏂囦欢**锛歚main/packet_forwarder/webpage.h`锛堢敓鎴愪骇鐗╋級銆乣scripts/dump_html.py`  
-- **涓ラ噸绾у埆**锛氱紪璇戝け璐ワ紙缂哄皯鐢熸垚鏂囦欢锛?
+# BUG-007：webpage.h 在 ESP-IDF 构建中不会自动生成
+
+- **日期**：2026-02-20  
+- **文件**：`main/packet_forwarder/webpage.h`（生成产物）、`scripts/dump_html.py`  
+- **严重级别**：编译失败（缺少生成文件）
+
 ---
 
-## 鐜拌薄
+## 现象
 
-浣跨敤 `idf.py build` 鏋勫缓鏃舵姤閿欙細
+使用 `idf.py build` 构建时报错：
 
 ```
 fatal error: webpage.h: No such file or directory
 ```
 
-`http_server.c` 涓?`#include "webpage.h"`锛屼絾璇ユ枃浠跺湪浠ｇ爜浠撳簱涓笉瀛樺湪銆?
+`http_server.c` 中 `#include "webpage.h"`，但该文件在代码仓库中不存在。
+
 ---
 
-## 鏍规湰鍘熷洜
+## 根本原因
 
-`webpage.h` 鏄敱 `scripts/dump_html.py` 浠?`main/packet_forwarder/webpage.html` 鐢熸垚鐨?C 瀛楄妭鏁扮粍澶存枃浠躲€?
-**PlatformIO** 宸ョ▼閫氳繃 `platformio_pre.py` 棰勬瀯寤洪挬瀛愯嚜鍔ㄨ繍琛岃鑴氭湰锛涗絾 **ESP-IDF CMake** 鏋勫缓涓嶈皟鐢?PlatformIO 閽╁瓙锛屽洜姝ゆ瘡娆?first-build 鎴?clean 鍚庨兘闇€瑕佹墜鍔ㄧ敓鎴愩€?
+`webpage.h` 是由 `scripts/dump_html.py` 从 `main/packet_forwarder/webpage.html` 生成的 C 字节数组头文件。
+
+**PlatformIO** 工程通过 `platformio_pre.py` 预构建钩子自动运行该脚本；但 **ESP-IDF CMake** 构建不调用 PlatformIO 钩子，因此每次 first-build 或 clean 后都需要手动生成。
+
 ---
 
-## 淇锛堜复鏃讹級
+## 修复（临时）
 
-鍦ㄩ娆℃瀯寤烘垨娓呯悊鍚庯紝鍦ㄩ」鐩牴鐩綍鎵嬪姩鎵ц锛?
+在首次构建或清理后，在项目根目录手动执行：
+
 ```bash
 cd main/packet_forwarder
 python ../../scripts/dump_html.py webpage.html webpage_str > webpage.h
 ```
 
-鎴栧湪 Windows PowerShell锛?
+或在 Windows PowerShell：
+
 ```powershell
 cd main\packet_forwarder
 python ..\..\scripts\dump_html.py webpage.html webpage_str > webpage.h
@@ -37,9 +44,10 @@ python ..\..\scripts\dump_html.py webpage.html webpage_str > webpage.h
 
 ---
 
-## 寤鸿锛堥暱鏈燂級
+## 建议（长期）
 
-鍦?`main/CMakeLists.txt` 涓€氳繃 `add_custom_command` / `add_custom_target` 灏嗙敓鎴愭楠ら泦鎴愬埌 CMake 鏋勫缓锛?
+在 `main/CMakeLists.txt` 中通过 `add_custom_command` / `add_custom_target` 将生成步骤集成到 CMake 构建：
+
 ```cmake
 add_custom_command(
     OUTPUT  ${CMAKE_CURRENT_SOURCE_DIR}/packet_forwarder/webpage.h
@@ -54,6 +62,6 @@ add_custom_command(
 
 ---
 
-## 娉ㄦ剰
+## 注意
 
-`webpage.h` 宸插姞鍏?`.gitignore`锛屼笉闇€瑕佹彁浜ゅ埌鐗堟湰搴撱€?
+`webpage.h` 已加入 `.gitignore`，不需要提交到版本库。

@@ -1,26 +1,31 @@
-# CHANGE-002锛氬畬鎴?GPS 绾跨▼ ESP32 绉绘锛屽疄鐜版椂闂村悓姝ヤ笌鍧愭爣涓婃姤
+# CHANGE-002：完成 GPS 线程 ESP32 移植，实现时间同步与坐标上报
 
-- **鏃ユ湡**锛?026-02-28  
-- **鍒嗘敮**锛歚bringup/gps`  
-- **娑夊強鏂囦欢**锛歚main/packet_forwarder/lora_pkt_fwd.c`銆乣main/board_config.h`
+- **日期**：2026-02-28  
+- **分支**：`bringup/gps`  
+- **涉及文件**：`main/packet_forwarder/lora_pkt_fwd.c`、`main/board_config.h`
 
 ---
 
-## 鑳屾櫙
+## 背景
 
-鍘熷伐绋嬩粠 Linux 鍙傝€冨疄鐜帮紙lora_pkt_fwd锛夌Щ妞嶈€屾潵锛孏PS 绾跨▼鐩稿叧浠ｇ爜鏁翠綋瀛樺湪浜庢簮鏂囦欢涓紝  
-浣嗕粠鏈湪 ESP32 涓婅繍琛岃繃锛屽睘浜?TODO 鐘舵€佺殑姝讳唬鐮併€傚叿浣撹〃鐜颁负锛?
-- `thread_gps` / `thread_valid` 琚?`#if 0` 鍖呰９锛屼粠鏈惎鍔?- 涓诲惊鐜腑鏈変竴娈典复鏃惰皟璇曚唬鐮佺洿鎺ヨ鍙?GPS UART锛屼粎鎵撳嵃涓嶈В鏋愶紝鍗犵敤浜嗕覆鍙ｆ暟鎹?- `thread_gps` 鍐呴儴浣跨敤 POSIX `read()` 绯荤粺璋冪敤锛屾棤娉曞湪 ESP-IDF 涓婃搷浣?UART
-- 鏃堕棿鍚屾浠呬緷璧?u-blox UBX 绉佹湁鍗忚甯э紝鑰岀‖浠?ATGM336H 浠呰緭鍑烘爣鍑?NMEA
+原工程从 Linux 参考实现（lora_pkt_fwd）移植而来，GPS 线程相关代码整体存在于源文件中，  
+但从未在 ESP32 上运行过，属于 TODO 状态的死代码。具体表现为：
 
-姝ゆ鍙樻洿灏嗕互涓婂洓涓棶棰樺叏閮ㄤ慨澶嶏紝瀹屾垚 GPS 鍔熻兘鐨?ESP32 绉绘銆?
+- `thread_gps` / `thread_valid` 被 `#if 0` 包裹，从未启动
+- 主循环中有一段临时调试代码直接读取 GPS UART，仅打印不解析，占用了串口数据
+- `thread_gps` 内部使用 POSIX `read()` 系统调用，无法在 ESP-IDF 上操作 UART
+- 时间同步仅依赖 u-blox UBX 私有协议帧，而硬件 ATGM336H 仅输出标准 NMEA
+
+此次变更将以上四个问题全部修复，完成 GPS 功能的 ESP32 移植。
+
 ---
 
-## 闂鍒嗘瀽
+## 问题分析
 
-### 闂涓€锛欸PS 绾跨▼浠庢湭鍚姩
+### 问题一：GPS 线程从未启动
 
-绾跨▼鍚姩浠ｇ爜娌跨敤浜?Linux `pthread_create`锛屽苟琚?`#if 0` 鍖呰９锛?
+线程启动代码沿用了 Linux `pthread_create`，并被 `#if 0` 包裹：
+
 ```c
 #if 0
     pthread_create(&thrid_gps, NULL, (void * (*)(void *))thread_gps, NULL);
@@ -28,59 +33,67 @@
 #endif
 ```
 
-娌℃湁 `thread_gps`锛孨MEA 鏁版嵁姘歌繙涓嶄細琚В鏋愶紝鍧愭爣鍜屾椂闂村彉閲忔案杩滀笉浼氳鏇存柊銆?
-### 闂浜岋細涓诲惊鐜姠鍗?UART 鏁版嵁
+没有 `thread_gps`，NMEA 数据永远不会被解析，坐标和时间变量永远不会被更新。
 
-涓诲惊鐜殑缁熻鍛ㄦ湡鍐呮湁涓€娈典复鏃惰皟璇曚唬鐮侊紝姣忔缁熻闂撮殧閮戒細璋冪敤 `uart_read_bytes`  
-灏?GPS 缂撳啿鍖轰腑鐨勬暟鎹叏閮ㄨ璧帮紝浠呭仛鎵撳嵃锛屽畬鍏ㄤ笉瑙ｆ瀽锛?
+### 问题二：主循环抢占 UART 数据
+
+主循环的统计周期内有一段临时调试代码，每次统计间隔都会调用 `uart_read_bytes`  
+将 GPS 缓冲区中的数据全部读走，仅做打印，完全不解析：
+
 ```c
-// 涓诲惊鐜瘡 5 绉?ESP_ERROR_CHECK(uart_get_buffered_data_len(gps_tty_fd, &length));
+// 主循环每 5 秒
+ESP_ERROR_CHECK(uart_get_buffered_data_len(gps_tty_fd, &length));
 length = uart_read_bytes(gps_tty_fd, data, min, 100);
-// 鈫?鏁版嵁鍏ㄨ鍚冩帀锛宼hread_gps 鎷夸笉鍒颁换浣曞瓧鑺?```
-
-杩欎篃瑙ｉ噴浜嗕负浠€涔堟棩蹇椾腑鍙互鐪嬪埌姝ｅ父鐨?NMEA 杈撳嚭锛堟湁鍗槦銆佹湁瀹氫綅锛夛紝  
-浣嗙▼搴忓嵈鎶ュ憡鍧愭爣涓嶅彲鐢ㄢ€斺€旀暟鎹涓诲惊鐜秷鑰楋紝`thread_gps` 浠庢湭杩愯鏇存棤浠庤В鏋愩€?
-鍚屾椂杩欐浠ｇ爜姣忔璇?900+ 瀛楄妭鐨勬暣鍧楁暟鎹紝澶氭潯 NMEA 璇彞娣峰悎鎵撳嵃锛? 
-閫犳垚鏃ュ織涓嚭鐜板抚閿欎綅鐨勪贡鐮佺幇璞★細
-
-```
-$GPGSV,2,1,07,01,73,05ZDA,052329.000   鈫?涓ゆ潯璇彞绮樿繛
-$GPGSV,2,1,07,01,73,=SOC_BootLoader   鈫?瀹屽叏涔辩爜
+// → 数据全被吃掉，thread_gps 拿不到任何字节
 ```
 
-### 闂涓夛細`thread_gps` 浣跨敤浜嗛敊璇殑 UART API
+这也解释了为什么日志中可以看到正常的 NMEA 输出（有卫星、有定位），  
+但程序却报告坐标不可用——数据被主循环消耗，`thread_gps` 从未运行更无从解析。
 
-`thread_gps` 鍐呴儴浣跨敤 POSIX `read()` 绯荤粺璋冪敤锛?
+同时这段代码每次读 900+ 字节的整块数据，多条 NMEA 语句混合打印，  
+造成日志中出现帧错位的乱码现象：
+
+```
+$GPGSV,2,1,07,01,73,05ZDA,052329.000   ← 两条语句粘连
+$GPGSV,2,1,07,01,73,=SOC_BootLoader   ← 完全乱码
+```
+
+### 问题三：`thread_gps` 使用了错误的 UART API
+
+`thread_gps` 内部使用 POSIX `read()` 系统调用：
+
 ```c
 ssize_t nb_char = read(gps_tty_fd, serial_buff + wr_idx, LGW_GPS_MIN_MSG_SIZE);
 ```
 
-浣?`gps_tty_fd` 瀹為檯涓婃槸 ESP-IDF 鐨?`uart_port_t`锛堟暣鏁扮鍙ｅ彿锛夛紝  
-涓嶆槸 Linux 鏂囦欢鎻忚堪绗︼紝`read()` 鍦?ESP-IDF 鐜涓棤娉曟搷浣?UART銆?
-### 闂鍥涳細鏃堕棿鍚屾浠呬緷璧?UBX 绉佹湁鍗忚
+但 `gps_tty_fd` 实际上是 ESP-IDF 的 `uart_port_t`（整数端口号），  
+不是 Linux 文件描述符，`read()` 在 ESP-IDF 环境中无法操作 UART。
 
-`gps_process_sync()` 鍙湪鏀跺埌 `UBX_NAV_TIMEGPS` 娑堟伅鏃惰Е鍙戯細
+### 问题四：时间同步仅依赖 UBX 私有协议
+
+`gps_process_sync()` 只在收到 `UBX_NAV_TIMEGPS` 消息时触发：
 
 ```c
 } else if (latest_msg == UBX_NAV_TIMEGPS) {
-    gps_process_sync();  // 鈫?ATGM336H 浠庝笉鍙戝嚭姝ゅ抚
+    gps_process_sync();  // ← ATGM336H 从不发出此帧
 }
-// NMEA_RMC 鍒嗘敮鍙皟鐢?gps_process_coords()锛屼笉鍚屾鏃堕棿
+// NMEA_RMC 分支只调用 gps_process_coords()，不同步时间
 ```
 
-ATGM336H 鏄浗浜фā鍧楋紝榛樿鍙緭鍑烘爣鍑?NMEA 鍗忚锛圙PS+鍖楁枟鍙屾ā锛夛紝  
-涓嶈緭鍑?u-blox UBX 绉佹湁鍗忚锛屽洜姝?`UBX_NAV_TIMEGPS` 姘歌繙涓嶄細鍑虹幇銆? 
-瀹為檯涓?`$GNRMC` 璇彞鏈韩灏卞寘鍚畬鏁寸殑鏃ユ湡鏃堕棿锛宍lgw_parse_nmea()` 瑙ｆ瀽鍚? 
-宸插皢鏃堕棿鍐欏叆鍐呴儴鍙橀噺锛坄gps_time_ok = true`锛夛紝鍙樊璋冪敤 `gps_process_sync()` 瑙﹀彂鍚屾銆?
+ATGM336H 是国产模块，默认只输出标准 NMEA 协议（GPS+北斗双模），  
+不输出 u-blox UBX 私有协议，因此 `UBX_NAV_TIMEGPS` 永远不会出现。  
+实际上 `$GNRMC` 语句本身就包含完整的日期时间，`lgw_parse_nmea()` 解析后  
+已将时间写入内部变量（`gps_time_ok = true`），只差调用 `gps_process_sync()` 触发同步。
+
 ---
 
-## 淇敼鍐呭
+## 修改内容
 
-### 1. 鐢?FreeRTOS 浠诲姟鏇挎崲 pthread锛屾寮忓惎鍔?GPS 绾跨▼
+### 1. 用 FreeRTOS 任务替换 pthread，正式启动 GPS 线程
 
 ```c
-// 鏃э細#if 0 鍖呰９鐨?pthread 浠ｇ爜
-// 鏂帮細
+// 旧：#if 0 包裹的 pthread 代码
+// 新：
 #if GPS_ENABLE
     if (gps_enabled == true) {
         xTaskCreatePinnedToCore((TaskFunction_t)thread_gps,  "thread_gps",
@@ -91,84 +104,92 @@ ATGM336H 鏄浗浜фā鍧楋紝榛樿鍙緭鍑烘爣鍑?NMEA 鍗忚�
 #endif
 ```
 
-### 2. 绂佺敤涓诲惊鐜腑鐨?GPS UART 璇诲彇
+### 2. 禁用主循环中的 GPS UART 读取
 
-鐢?`#if 0` 绂佺敤涓诲惊鐜噷鐨勮皟璇曡鍙栧潡锛岃 `thread_gps` 鐙崰涓插彛锛?
+用 `#if 0` 禁用主循环里的调试读取块，让 `thread_gps` 独占串口：
+
 ```c
 #if 0  /* Disabled: thread_gps now handles UART reading and NMEA parsing */
     if (gps_enabled) {
-        uart_read_bytes(...);   // 杩欐浠ｇ爜涓嶅啀鎵ц
+        uart_read_bytes(...);   // 这段代码不再执行
         ...
     }
 #endif
 ```
 
-### 3. 鐢?`uart_read_bytes()` 鏇挎崲 `read()`
+### 3. 用 `uart_read_bytes()` 替换 `read()`
 
 ```c
-// 鏃?ssize_t nb_char = read(gps_tty_fd, serial_buff + wr_idx, LGW_GPS_MIN_MSG_SIZE);
+// 旧
+ssize_t nb_char = read(gps_tty_fd, serial_buff + wr_idx, LGW_GPS_MIN_MSG_SIZE);
 
-// 鏂?int nb_char = uart_read_bytes(gps_tty_fd, (uint8_t *)(serial_buff + wr_idx),
+// 新
+int nb_char = uart_read_bytes(gps_tty_fd, (uint8_t *)(serial_buff + wr_idx),
                               LGW_GPS_MIN_MSG_SIZE, pdMS_TO_TICKS(1000));
 ```
 
-`uart_read_bytes` 甯﹁秴鏃跺弬鏁帮紝閬垮厤姝荤瓑锛屼篃绗﹀悎 FreeRTOS 浠诲姟璋冨害涔犳儻銆?
-### 4. 鍦?NMEA_RMC 鍒嗘敮瑙﹀彂鏃堕棿鍚屾
+`uart_read_bytes` 带超时参数，避免死等，也符合 FreeRTOS 任务调度习惯。
+
+### 4. 在 NMEA_RMC 分支触发时间同步
 
 ```c
 } else if (latest_msg == NMEA_RMC) {
     gps_process_coords();
-    gps_process_sync();  // 鈫?鏂板锛欰TGM336H 鏃?UBX锛屼粠 RMC 鍚屾鏃堕棿
+    gps_process_sync();  // ← 新增：ATGM336H 无 UBX，从 RMC 同步时间
 }
 ```
 
-`lgw_parse_nmea()` 瑙ｆ瀽 `$GNRMC` 鍚庡凡鏇存柊 `gps_time_ok` 鍜屾椂闂村彉閲忥紝  
-姝ゆ椂璋冪敤 `gps_process_sync()` 鍙互灏?GPS 鏃堕棿涓?SX1302 纭欢璁℃暟鍣ㄥ仛鍏宠仈銆?
-### 5. 灏?GPS 缂栬瘧寮€鍏冲拰鏃ュ織绛夌骇绉诲叆 `board_config.h`
+`lgw_parse_nmea()` 解析 `$GNRMC` 后已更新 `gps_time_ok` 和时间变量，  
+此时调用 `gps_process_sync()` 可以将 GPS 时间与 SX1302 硬件计数器做关联。
+
+### 5. 将 GPS 编译开关和日志等级移入 `board_config.h`
 
 ```c
-// board_config.h 鏂板
-#define GPS_ENABLE       1   // 0 = 绂佺敤鎵€鏈?GPS 浠ｇ爜
-#define GPS_LOG_VERBOSE  0   // 0=闈欓粯  1=鍏抽敭浜嬩欢  2=瀹屾暣 NMEA 杞偍
+// board_config.h 新增
+#define GPS_ENABLE       1   // 0 = 禁用所有 GPS 代码
+#define GPS_LOG_VERBOSE  0   // 0=静默  1=关键事件  2=完整 NMEA 转储
 ```
 
-鍘?`lora_pkt_fwd.c` 涓殑 `#define GPS_LOG_VERBOSE 1` 绉婚櫎锛? 
-GPS 鍒濆鍖栥€佺嚎绋嬪惎鍔ㄣ€佸嚱鏁板畾涔夊潎鐢?`#if GPS_ENABLE` 鍖呰９銆?
-### 6. 鏀瑰杽 GPS 鏃ュ織
+原 `lora_pkt_fwd.c` 中的 `#define GPS_LOG_VERBOSE 1` 移除，  
+GPS 初始化、线程启动、函数定义均用 `#if GPS_ENABLE` 包裹。
 
-| 鏃ュ織绛夌骇 | 杈撳嚭鍐呭 |
+### 6. 改善 GPS 日志
+
+| 日志等级 | 输出内容 |
 |----------|----------|
-| `GPS_LOG_VERBOSE 0` | 鏃?GPS 璋冭瘯杈撳嚭锛宍could not get GPS time` 闈欓粯 |
-| `GPS_LOG_VERBOSE 1` | 姣忔鍚屾鎴愬姛鎵撳嵃 UTC 鏃堕棿锛涙瘡 5 绉掓墦鍗?fix 鐘舵€?鍧愭爣 |
-| `GPS_LOG_VERBOSE 2` | 锛堥鐣欙級瀹屾暣 NMEA 甯ц浆鍌?|
+| `GPS_LOG_VERBOSE 0` | 无 GPS 调试输出，`could not get GPS time` 静默 |
+| `GPS_LOG_VERBOSE 1` | 每次同步成功打印 UTC 时间；每 5 秒打印 fix 状态+坐标 |
+| `GPS_LOG_VERBOSE 2` | （预留）完整 NMEA 帧转储 |
 
 ---
 
-## 楠岃瘉缁撴灉
+## 验证结果
 
-| 楠岃瘉椤?| 缁撴灉 |
+| 验证项 | 结果 |
 |--------|------|
-| 绾跨▼鍚姩 | 鉁?`thread_gps spawned` / `thread_valid spawned` |
-| GPS 鍧愭爣 | 鉁?`GPS coordinates: latitude 31.31109, longitude 121.37719, altitude 45 m` |
-| 鏃堕棿鍙傝€冩湁鏁?| 鉁?`Valid time reference (age: 0 sec)` |
-| JSON 涓婃姤鍚潗鏍?| 鉁?`"lati":31.31109,"long":121.37719,"alti":45` |
-| 缂栬瘧鏃犻敊璇?| 鉁?`Project build complete` |
+| 线程启动 | ✅ `thread_gps spawned` / `thread_valid spawned` |
+| GPS 坐标 | ✅ `GPS coordinates: latitude 31.31109, longitude 121.37719, altitude 45 m` |
+| 时间参考有效 | ✅ `Valid time reference (age: 0 sec)` |
+| JSON 上报含坐标 | ✅ `"lati":31.31109,"long":121.37719,"alti":45` |
+| 编译无错误 | ✅ `Project build complete` |
 
 ---
 
-## 纭欢鎺ョ嚎澶囨敞
+## 硬件接线备注
 
-| 淇″彿 | GPIO |
+| 信号 | GPIO |
 |------|------|
-| GPS TX锛堟ā鍧楀彂锛?| GPIO 20锛圗SP32 RX锛?|
-| GPS RX锛堟ā鍧楁敹锛?| GPIO 19锛圗SP32 TX锛?|
+| GPS TX（模块发） | GPIO 20（ESP32 RX） |
+| GPS RX（模块收） | GPIO 19（ESP32 TX） |
 | GPS VCC | 3.3 V |
 | GPS GND | GND |
 
-- 娉㈢壒鐜囷細9600锛圓TGM336H 榛樿锛?- 杈撳嚭璇彞锛歚$GNGGA`銆乣$GNRMC`銆乣$GNZDA`銆乣$GPGSV`銆乣$BDGSV` 绛夛紙GPS+鍖楁枟鍙屾ā锛?
+- 波特率：9600（ATGM336H 默认）
+- 输出语句：`$GNGGA`、`$GNRMC`、`$GNZDA`、`$GPGSV`、`$BDGSV` 等（GPS+北斗双模）
+
 ---
 
-## 鐩稿叧鏂囨。
+## 相关文档
 
-- 瀛︿範绗旇锛歔gps_nmea_and_lorawan_sync.md](../learning/gps_nmea_and_lorawan_sync.md)
-- 瀵瑰簲 commit锛歚68eb6a4 fix: complete ESP32 port of GPS sync thread (ATGM336H, NMEA-only)`
+- 学习笔记：[gps_nmea_and_lorawan_sync.md](../learning/gps_nmea_and_lorawan_sync.md)
+- 对应 commit：`68eb6a4 fix: complete ESP32 port of GPS sync thread (ATGM336H, NMEA-only)`

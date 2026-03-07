@@ -1,49 +1,56 @@
-# BUG-009锛氱綉鍏?Web 閰嶇疆椤甸潰杩斿洖 HTTP 431 Request Header Fields Too Large
+# BUG-009：网关 Web 配置页面返回 HTTP 431 Request Header Fields Too Large
 
-- **鏃ユ湡**锛?026-02-20  
-- **鏂囦欢**锛歚sdkconfig`銆乣sdkconfig.defaults`  
-- **涓ラ噸绾у埆**锛氬姛鑳芥€ч敊璇紙Web 閰嶇疆鐣岄潰鏃犳硶璁块棶锛?
+- **日期**：2026-02-20  
+- **文件**：`sdkconfig`、`sdkconfig.defaults`  
+- **严重级别**：功能性错误（Web 配置界面无法访问）
+
 ---
 
-## 鐜拌薄
+## 现象
 
-鍦ㄦ祻瑙堝櫒涓闂綉鍏?Web 閰嶇疆椤甸潰锛坄http://<璁惧IP>/`锛夋椂锛屾湇鍔″櫒杩斿洖锛?
+在浏览器中访问网关 Web 配置页面（`http://<设备IP>/`）时，服务器返回：
+
 ```
 431 Request Header Fields Too Large
 ```
 
-鐜颁唬娴忚鍣ㄥ彂閫佺殑 HTTP 璇锋眰澶达紙鍖呭惈 Host銆乁ser-Agent銆丄ccept銆丄uthorization 绛夛級鎬婚暱搴﹂€氬父瓒呰繃 512 瀛楄妭銆?
+现代浏览器发送的 HTTP 请求头（包含 Host、User-Agent、Accept、Authorization 等）总长度通常超过 512 字节。
+
 ---
 
-## 鏍规湰鍘熷洜
+## 根本原因
 
-ESP-IDF `esp_http_server` 缁勪欢鐨勬渶澶ц姹傚ご闀垮害鐢?Kconfig 閫夐」 `CONFIG_HTTPD_MAX_REQ_HDR_LEN` 鎺у埗锛岄粯璁ゅ€间负 **512 瀛楄妭**銆?
-`httpd_config_t` 缁撴瀯浣?*娌℃湁** `max_req_hdr_len` 杩愯鏃跺瓧娈碉紝璇ラ檺鍒跺彧鑳介€氳繃 Kconfig 鍦ㄧ紪璇戞椂閰嶇疆銆?
+ESP-IDF `esp_http_server` 组件的最大请求头长度由 Kconfig 选项 `CONFIG_HTTPD_MAX_REQ_HDR_LEN` 控制，默认值为 **512 字节**。
+
+`httpd_config_t` 结构体**没有** `max_req_hdr_len` 运行时字段，该限制只能通过 Kconfig 在编译时配置。
+
 ---
 
-## 閿欒灏濊瘯
+## 错误尝试
 
-灏濊瘯鍦?`http_server.c` 涓€氳繃缁撴瀯浣撳瓧娈佃鐩栵細
+尝试在 `http_server.c` 中通过结构体字段覆盖：
 
 ```c
 httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-config.max_req_hdr_len = 2048;   // 鈫?缂栬瘧鎶ラ敊锛歴truct 鏃犳鎴愬憳
+config.max_req_hdr_len = 2048;   // ← 编译报错：struct 无此成员
 ```
 
-璇ュ瓧娈典笉瀛樺湪锛屾鏂规涓嶅彲琛屻€?
+该字段不存在，此方案不可行。
+
 ---
 
-## 淇
+## 修复
 
-鍦?`sdkconfig.defaults` 涓鍔狅細
+在 `sdkconfig.defaults` 中增加：
 
 ```
 CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048
 ```
 
-鍚屾椂鍦?`sdkconfig` 涓皢瀵瑰簲椤逛粠 512 鏀逛负 2048锛岄噸鏂扮紪璇戠儳褰曞悗 Web 閰嶇疆椤甸潰鍙甯歌闂€?
+同时在 `sdkconfig` 中将对应项从 512 改为 2048，重新编译烧录后 Web 配置页面可正常访问。
+
 ---
 
-## 楠岃瘉
+## 验证
 
-淇鍚庢祻瑙堝櫒璁块棶 `http://<璁惧IP>/`锛屾甯告樉绀虹櫥褰曟鍙婇厤缃〉闈紝HTTP Basic Auth锛坄iot` / `lora`锛夐€氳繃锛岄厤缃繚瀛樺姛鑳芥甯搞€?
+修复后浏览器访问 `http://<设备IP>/`，正常显示登录框及配置页面，HTTP Basic Auth（`iot` / `lora`）通过，配置保存功能正常。

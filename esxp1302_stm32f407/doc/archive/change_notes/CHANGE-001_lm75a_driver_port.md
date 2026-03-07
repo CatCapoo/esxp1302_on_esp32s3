@@ -1,123 +1,141 @@
-# CHANGE-001锛氱Щ妞?NXP LM75A 娓╁害浼犳劅鍣ㄩ┍鍔紙鏇挎崲 ST STTS751锛?
-- **鏃ユ湡**锛?026-02-27  
-- **鍒嗘敮**锛歚bringup/temp`  
-- **娑夊強鏂囦欢**锛歚main/libloragw/loragw_lm75a.c/.h`銆乣loragw_i2c.c/.h`銆乣loragw_hal.c`銆乣main/CMakeLists.txt`銆乣test/test_loragw_i2c.c`
+# CHANGE-001：移植 NXP LM75A 温度传感器驱动（替换 ST STTS751）
+
+- **日期**：2026-02-27  
+- **分支**：`bringup/temp`  
+- **涉及文件**：`main/libloragw/loragw_lm75a.c/.h`、`loragw_i2c.c/.h`、`loragw_hal.c`、`main/CMakeLists.txt`、`test/test_loragw_i2c.c`
 
 ---
 
-## 鑳屾櫙
+## 背景
 
-鍘熷伐绋嬩娇鐢?ST STTS751 浣滀负 SX1302 HAL 灞傜殑娓╁害浼犳劅鍣紝鐢ㄤ簬锛?1. **RSSI 娓╁害琛ュ伩**锛氭瘡娆?`lgw_receive()` 鍚庤皟鐢?`lgw_get_temperature()`锛屾寜 cn490 绯绘暟澶氶」寮忎慨姝?RSSI
-2. **鐘舵€佷笂鎶?*锛歱acket forwarder 姣?30 绉掑湪缁熻 JSON 涓笂鎶?`"temp"` 瀛楁
+原工程使用 ST STTS751 作为 SX1302 HAL 层的温度传感器，用于：
+1. **RSSI 温度补偿**：每次 `lgw_receive()` 后调用 `lgw_get_temperature()`，按 cn490 系数多项式修正 RSSI
+2. **状态上报**：packet forwarder 每 30 秒在统计 JSON 中上报 `"temp"` 字段
 
-纭欢鏉夸笂瀹為檯鐒婃帴鐨勬槸 NXP LM75A锛屼笌 STTS751 寮曡剼/瀵勫瓨鍣ㄥ潎涓嶅吋瀹癸紝闇€瑕侀噸鏂扮Щ妞嶉┍鍔ㄣ€?
+硬件板上实际焊接的是 NXP LM75A，与 STTS751 引脚/寄存器均不兼容，需要重新移植驱动。
+
 ---
 
-## LM75A 涓?STTS751 宸紓瀵规瘮
+## LM75A 与 STTS751 差异对比
 
-| 椤圭洰 | STTS751 | LM75A |
+| 项目 | STTS751 | LM75A |
 |------|---------|-------|
-| 鍒嗚鲸鐜?| 12-bit锛?.0625掳C | 11-bit锛?.125掳C |
-| 娓╁害瀵勫瓨鍣ㄥ湴鍧€ | MSB=0x00锛孡SB=0x02锛堝垎涓ゆ璇伙級 | 0x00锛堜竴娆¤ 2 瀛楄妭锛?|
-| 閰嶇疆瀵勫瓨鍣?| 0x03 | 0x01 |
-| 杞崲閫熺巼瀵勫瓨鍣?| 0x04锛堥渶鍗曠嫭璁剧疆锛?| 鏃狅紙杩炵画杞崲锛屽浐瀹氾級 |
-| 浜у搧/鍘傚晢 ID 瀵勫瓨鍣?| 0xFD/0xFE/0xFF | 鏃?|
-| I2C 鍦板潃鑼冨洿 | 0x48~0x4F锛? 浣嶅湴鍧€寮曡剼锛?| 0x48~0x4F锛? 浣嶅湴鍧€寮曡剼锛?|
+| 分辨率 | 12-bit，0.0625°C | 11-bit，0.125°C |
+| 温度寄存器地址 | MSB=0x00，LSB=0x02（分两次读） | 0x00（一次读 2 字节） |
+| 配置寄存器 | 0x03 | 0x01 |
+| 转换速率寄存器 | 0x04（需单独设置） | 无（连续转换，固定） |
+| 产品/厂商 ID 寄存器 | 0xFD/0xFE/0xFF | 无 |
+| I2C 地址范围 | 0x48~0x4F（3 位地址引脚） | 0x48~0x4F（3 位地址引脚） |
 
 ---
 
-## 瀹炵幇鍐呭
+## 实现内容
 
-### 1. 鏂板 `loragw_lm75a.h` / `loragw_lm75a.c`
+### 1. 新增 `loragw_lm75a.h` / `loragw_lm75a.c`
 
 - **`lm75a_configure(uint8_t i2c_addr)`**  
-  璇婚厤缃瘎瀛樺櫒锛?x01锛夌‘璁よ澶囧湪绾匡紝鍐?`0x00` 璁句负姝ｅ父宸ヤ綔妯″紡锛堥潪 shutdown銆丱S 姣旇緝鍣ㄦā寮忋€佷綆鐢靛钩鏈夋晥锛?
+  读配置寄存器（0x01）确认设备在线，写 `0x00` 设为正常工作模式（非 shutdown、OS 比较器模式、低电平有效）
+
 - **`lm75a_get_temperature(uint8_t i2c_addr, float *temperature)`**  
-  璋冪敤 `i2c_esp32_read_word()` 涓€娆¤鍙?2 瀛楄妭锛屾嫾瑁呬负 `int16_t` 鍚庨櫎浠?256.0 寰楀埌 掳C  
-  鍏紡锛歚raw = (buf[0]<<8 | buf[1])`锛堟湁绗﹀彿锛夛紝`temp = raw / 256.0f`
+  调用 `i2c_esp32_read_word()` 一次读取 2 字节，拼装为 `int16_t` 后除以 256.0 得到 °C  
+  公式：`raw = (buf[0]<<8 | buf[1])`（有符号），`temp = raw / 256.0f`
 
-- **鍦板潃鎵弿鏁扮粍**锛坄loragw_lm75a.h` 涓畾涔夛級锛? 
-  `{0x48, 0x49, 0x4A, 0x4B}`锛?x48 鎺掔涓€锛堥伩鍏?NACK 姹℃煋鍚庣画鍦板潃鎵弿鐨勬€荤嚎鐘舵€侊級
+- **地址扫描数组**（`loragw_lm75a.h` 中定义）：  
+  `{0x48, 0x49, 0x4A, 0x4B}`，0x48 排第一（避免 NACK 污染后续地址扫描的总线状态）
 
-### 2. 鏂板 `i2c_esp32_read_word()`锛坄loragw_i2c.c/.h`锛?
-STTS751 涓や釜娓╁害瀛楄妭鍦ㄤ笉鍚屽瘎瀛樺櫒鍦板潃锛屽彲鐢ㄤ袱娆?`i2c_esp32_read()` 璇诲彇銆? 
-LM75A 鐨?16-bit 娓╁害瀵勫瓨鍣ㄩ渶瑕佸湪鍚屼竴 I2C 浜嬪姟鍐呰繛缁鍑?MSB + LSB锛屽惁鍒欎袱娆¤涔嬮棿浼犳劅鍣ㄥ彲鑳芥洿鏂版暟鎹鑷村瓧鑺備笉涓€鑷淬€?
+### 2. 新增 `i2c_esp32_read_word()`（`loragw_i2c.c/.h`）
+
+STTS751 两个温度字节在不同寄存器地址，可用两次 `i2c_esp32_read()` 读取。  
+LM75A 的 16-bit 温度寄存器需要在同一 I2C 事务内连续读出 MSB + LSB，否则两次读之间传感器可能更新数据导致字节不一致。
+
 ```c
-// 鍗曚簨鍔¤ 2 瀛楄妭锛氬厛鍐欏瘎瀛樺櫒鍦板潃锛岄噸鏂?START 鍚庤繛璇?MSB(ACK)+LSB(NACK)
+// 单事务读 2 字节：先写寄存器地址，重新 START 后连读 MSB(ACK)+LSB(NACK)
 esp_err_t i2c_esp32_read_word(uint8_t device_addr, uint8_t reg_addr, uint8_t *data);
 ```
 
-### 3. 鏇存柊 `loragw_hal.c`
+### 3. 更新 `loragw_hal.c`
 
 ```c
-// 鏃?#include "loragw_stts751.h"
+// 旧
+#include "loragw_stts751.h"
 err = stts751_configure(ts_addr);
 err = stts751_get_temperature(ts_addr, temperature);
 
-// 鏂?#include "loragw_lm75a.h"
+// 新
+#include "loragw_lm75a.h"
 err = lm75a_configure(ts_addr);
 err = lm75a_get_temperature(ts_addr, temperature);
 ```
 
-### 4. 鏇存柊 `main/CMakeLists.txt`
+### 4. 更新 `main/CMakeLists.txt`
 
 ```cmake
-# 鏃?"libloragw/loragw_stts751.c"
-# 鏂?"libloragw/loragw_lm75a.c"
+# 旧
+"libloragw/loragw_stts751.c"
+# 新
+"libloragw/loragw_lm75a.c"
 ```
 
-娉細`loragw_stts751.c/.h` 鏂囦欢淇濈暀鍦ㄦ枃浠剁郴缁燂紝涓嶅弬涓庣紪璇戯紝浠呬綔鍘嗗彶鍙傝€冦€?
-### 5. 閲嶅啓 `test/test_loragw_i2c.c`
+注：`loragw_stts751.c/.h` 文件保留在文件系统，不参与编译，仅作历史参考。
 
-绉婚櫎 STTS751 鐨?Product ID / Manufacturer ID 鏍￠獙閫昏緫锛屾敼涓猴細
-- 璇?LM75A 閰嶇疆瀵勫瓨鍣紙0x01锛夐獙璇佽澶囧湪绾?- 寰幆 100 娆¤鍙栨俯搴︼紝姣忔璋冪敤 `i2c_esp32_read_word()`锛屾墦鍗板師濮嬪瓧鑺傚拰鎹㈢畻鍚庢俯搴?
----
+### 5. 重写 `test/test_loragw_i2c.c`
 
-## 璋冭瘯杩囩▼涓亣鍒扮殑闂
-
-### 闂 1锛氬湴鍧€寮曡剼鎮┖
-
-**鐜拌薄**锛氭祴璇曠▼搴忓 0x48 鑳借鍒版暟鎹紝涓荤▼搴忔壂鎻忓け璐? 
-**鍘熷洜**锛氬湴鍧€寮曡剼 A0/A1/A2 鎮┖锛屽疄闄呭湴鍧€涓嶇‘瀹氾紱鍚庣‘璁?A0=A1=A2=GND 鈫?鍦板潃 0x48  
-**瑙ｅ喅**锛氬皢鍦板潃寮曡剼纭疄鎺ュ湴锛屽悓鏃跺皢鎵弿鏁扮粍棣栦綅鏀逛负 0x48
-
-### 闂 2锛歂ACK 姹℃煋鎬荤嚎
-
-**鐜拌薄**锛氫富绋嬪簭鎵弿鏃讹紝濡傛灉鍏堟壂鎻忓埌鏃犳晥鍦板潃浜х敓 NACK锛屽悗缁姝ｇ‘鍦板潃鐨勮闂篃澶辫触  
-**鍘熷洜**锛欵SP-IDF legacy I2C driver 鍦?NACK 鍚庢湭瀹屾暣閲婃斁鎬荤嚎锛圫DA 琚粠璁惧鎷変綆锛夛紝瀵艰嚧涓嬩竴娆′簨鍔″惎鍔ㄥけ璐? 
-**瑙ｅ喅**锛氬皢宸茬煡瀛樺湪鐨?0x48 鏀惧湪鎵弿鏁扮粍绗竴浣嶏紝閬垮厤鍏堟壂鍒版棤鏁堝湴鍧€
-
-### 闂 3锛歚pkt_fwd` 浠诲姟鏍堟孩鍑?
-**鐜拌薄**锛氫富绋嬪簭杩愯涓€娈垫椂闂村悗宕╂簝锛屾棩蹇楀嚭鐜?stack overflow  
-**鍘熷洜**锛氫换鍔℃爤璁句负 `1*4096`锛? KB锛夛紝HAL + I2C + JSON 缁勫抚鎿嶄綔瓒呭嚭  
-**瑙ｅ喅**锛氭敼涓?`4*4096`锛?6 KB锛?
-### 闂 4锛歚CHECK_NULL` 瀹忎娇鐢ㄤ簡閿欒鐨勮繑鍥炲€煎父閲?
-**鐜拌薄**锛氱紪璇戝け璐ワ紝`LGW_REG_ERROR` 鏈０鏄? 
-**鍘熷洜**锛氫粠 `loragw_stts751.c` 澶嶅埗瀹忓畾涔夋椂鏈浛鎹㈣繑鍥炲€煎父閲? 
-**瑙ｅ喅**锛氭敼涓?`LGW_I2C_ERROR`
+移除 STTS751 的 Product ID / Manufacturer ID 校验逻辑，改为：
+- 读 LM75A 配置寄存器（0x01）验证设备在线
+- 循环 100 次读取温度，每次调用 `i2c_esp32_read_word()`，打印原始字节和换算后温度
 
 ---
 
-## 楠岃瘉缁撴灉
+## 调试过程中遇到的问题
 
-| 楠岃瘉椤?| 缁撴灉 |
+### 问题 1：地址引脚悬空
+
+**现象**：测试程序对 0x48 能读到数据，主程序扫描失败  
+**原因**：地址引脚 A0/A1/A2 悬空，实际地址不确定；后确认 A0=A1=A2=GND → 地址 0x48  
+**解决**：将地址引脚确实接地，同时将扫描数组首位改为 0x48
+
+### 问题 2：NACK 污染总线
+
+**现象**：主程序扫描时，如果先扫描到无效地址产生 NACK，后续对正确地址的访问也失败  
+**原因**：ESP-IDF legacy I2C driver 在 NACK 后未完整释放总线（SDA 被从设备拉低），导致下一次事务启动失败  
+**解决**：将已知存在的 0x48 放在扫描数组第一位，避免先扫到无效地址
+
+### 问题 3：`pkt_fwd` 任务栈溢出
+
+**现象**：主程序运行一段时间后崩溃，日志出现 stack overflow  
+**原因**：任务栈设为 `1*4096`（4 KB），HAL + I2C + JSON 组帧操作超出  
+**解决**：改为 `4*4096`（16 KB）
+
+### 问题 4：`CHECK_NULL` 宏使用了错误的返回值常量
+
+**现象**：编译失败，`LGW_REG_ERROR` 未声明  
+**原因**：从 `loragw_stts751.c` 复制宏定义时未替换返回值常量  
+**解决**：改为 `LGW_I2C_ERROR`
+
+---
+
+## 验证结果
+
+| 验证项 | 结果 |
 |--------|------|
-| 娴嬭瘯绋嬪簭 100 娆¤娓?| 鉁?22~23.75掳C锛屽垎杈ㄧ巼 0.125掳C |
-| 涓荤▼搴忔壘鍒颁紶鎰熷櫒 | 鉁?`INFO: found temperature sensor on port 0x48` |
-| 缁熻 JSON 娓╁害瀛楁 | 鉁?`"temp":22.5` |
-| RSSI 娓╁害琛ュ伩鐢熸晥 | 鉁?`RSSI temperature offset applied: 0.918 dB (current temperature 22.9 C)` |
-| 缂栬瘧鏃犻敊璇?璀﹀憡 | 鉁?|
+| 测试程序 100 次读温 | ✅ 22~23.75°C，分辨率 0.125°C |
+| 主程序找到传感器 | ✅ `INFO: found temperature sensor on port 0x48` |
+| 统计 JSON 温度字段 | ✅ `"temp":22.5` |
+| RSSI 温度补偿生效 | ✅ `RSSI temperature offset applied: 0.918 dB (current temperature 22.9 C)` |
+| 编译无错误/警告 | ✅ |
 
 ---
 
-## 纭欢鎺ョ嚎澶囨敞
+## 硬件接线备注
 
-| 淇″彿 | GPIO |
+| 信号 | GPIO |
 |------|------|
 | SDA | GPIO 4 |
 | SCL | GPIO 5 |
 | VCC | 3.3 V |
 | GND | GND |
-| A0/A1/A2 | 鍏ㄩ儴鎺?GND 鈫?鍦板潃 0x48 |
+| A0/A1/A2 | 全部接 GND → 地址 0x48 |
 
-**娉ㄦ剰浜嬮」**锛?- LM75A VCC 寮曡剼闇€骞惰仈 100nF 闄剁摲鍘昏€︾數瀹癸紝鍚﹀垯鍙兘寮曡捣 I2C 鎬荤嚎鍣０锛岃繘鑰屽鑷?SX1302 鏀跺寘 CRC 澶辫触鐜囦笂鍗?- I2C 杩炵嚎搴斿敖閲忕煭锛?10cm锛夛紝杩滅澶╃嚎鍜?SX1302 RF 璧扮嚎
+**注意事项**：
+- LM75A VCC 引脚需并联 100nF 陶瓷去耦电容，否则可能引起 I2C 总线噪声，进而导致 SX1302 收包 CRC 失败率上升
+- I2C 连线应尽量短（<10cm），远离天线和 SX1302 RF 走线

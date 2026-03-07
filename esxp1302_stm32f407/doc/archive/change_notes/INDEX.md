@@ -1,7 +1,6 @@
-# 鍙樻洿璁板綍绱㈠紩
+# 变更记录索引
 
-| 缂栧彿 | 鏃ユ湡 | 绠€瑕佹弿杩?|
+| 编号 | 日期 | 简要描述 |
 |------|------|----------|
-| [CHANGE-001](CHANGE-001_lm75a_driver_port.md) | 2026-02-27 | 绉绘 NXP LM75A 娓╁害浼犳劅鍣ㄩ┍鍔紝鏇挎崲 ST STTS751 |
-| [CHANGE-002](CHANGE-002_gps_thread_esp32_port.md) | 2026-02-28 | 瀹屾垚 GPS 绾跨▼ ESP32 绉绘锛屽疄鐜?ATGM336H 鏃堕棿鍚屾涓庡潗鏍囦笂鎶?|
-
+| [CHANGE-001](CHANGE-001_lm75a_driver_port.md) | 2026-02-27 | 移植 NXP LM75A 温度传感器驱动，替换 ST STTS751 |
+| [CHANGE-002](CHANGE-002_gps_thread_esp32_port.md) | 2026-02-28 | 完成 GPS 线程 ESP32 移植，实现 ATGM336H 时间同步与坐标上报 |

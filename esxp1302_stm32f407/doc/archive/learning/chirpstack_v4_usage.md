@@ -1,64 +1,74 @@
-# ChirpStack v4 浣跨敤绗旇
+# ChirpStack v4 使用笔记
 
-> 鍐欎綔鑳屾櫙锛?026-02-22 瀹屾垚 ESXP1302 鎺ュ叆 ChirpStack v4 鐨勫叏閾捐矾璋冭瘯锛?> 璁板綍 ChirpStack 鐨勯厤缃綋绯汇€佸父瑙佹搷浣滃拰璋冭瘯鎶€宸с€?
+> 写作背景：2026-02-22 完成 ESXP1302 接入 ChirpStack v4 的全链路调试，
+> 记录 ChirpStack 的配置体系、常见操作和调试技巧。
+
 ---
 
-## 涓€銆丆hirpStack v4 鏁翠綋鏋舵瀯
+## 一、ChirpStack v4 整体架构
 
-ChirpStack v4 鐩告瘮 v3 鍋氫簡閲嶅ぇ閲嶆瀯锛?
-| 瀵规瘮椤?| v3 | v4 |
+ChirpStack v4 相比 v3 做了重大重构：
+
+| 对比项 | v3 | v4 |
 |--------|----|----|
-| 缁勪欢鏁伴噺 | NS + AS + GW Bridge锛?涓嫭绔嬫湇鍔★級| 鍚堝苟涓哄崟涓€ `chirpstack` 杩涚▼ |
-| 鏁版嵁搴?| PostgreSQL + Redis | 鍚屼笂 |
-| 閰嶇疆鏍煎紡 | 鍚勬湇鍔＄嫭绔?TOML | 鍗曚竴 chirpstack.toml + region_xxx.toml |
-| Region 鏀寔 | 缂栬瘧鏃跺喅瀹?| 杩愯鏃堕厤缃紝鍙 region 鍚屾椂杩愯 |
-| API | gRPC + REST | 鍚屼笂锛孯EST via chirpstack-rest-api |
+| 组件数量 | NS + AS + GW Bridge（3个独立服务）| 合并为单一 `chirpstack` 进程 |
+| 数据库 | PostgreSQL + Redis | 同上 |
+| 配置格式 | 各服务独立 TOML | 单一 chirpstack.toml + region_xxx.toml |
+| Region 支持 | 编译时决定 | 运行时配置，可多 region 同时运行 |
+| API | gRPC + REST | 同上，REST via chirpstack-rest-api |
 
-### 1.1 Docker 閮ㄧ讲缁撴瀯锛堟湰椤圭洰锛?
+### 1.1 Docker 部署结构（本项目）
+
 ```
 ~/chirpstack-docker/
-鈹溾攢鈹€ docker-compose.yml           鈫?鎵€鏈夊鍣ㄥ畾涔?鈹斺攢鈹€ configuration/
-    鈹溾攢鈹€ chirpstack/
-    鈹?  鈹溾攢鈹€ chirpstack.toml      鈫?NS 涓婚厤缃?    鈹?  鈹溾攢鈹€ region_cn470_10.toml 鈫?CN470_10 鍖哄煙閰嶇疆
-    鈹?  鈹斺攢鈹€ region_*.toml        鈫?鍏朵粬鍖哄煙锛堝彲閫夛級
-    鈹溾攢鈹€ chirpstack-gateway-bridge/
-    鈹?  鈹斺攢鈹€ chirpstack-gateway-bridge.toml
-    鈹斺攢鈹€ mosquitto/
-        鈹斺攢鈹€ mosquitto.conf
+├── docker-compose.yml           ← 所有容器定义
+└── configuration/
+    ├── chirpstack/
+    │   ├── chirpstack.toml      ← NS 主配置
+    │   ├── region_cn470_10.toml ← CN470_10 区域配置
+    │   └── region_*.toml        ← 其他区域（可选）
+    ├── chirpstack-gateway-bridge/
+    │   └── chirpstack-gateway-bridge.toml
+    └── mosquitto/
+        └── mosquitto.conf
 ```
 
-### 1.2 鍚勫鍣ㄧ鍙?
-| 瀹瑰櫒 | 绔彛 | 鐢ㄩ€?|
+### 1.2 各容器端口
+
+| 容器 | 端口 | 用途 |
 |------|------|------|
 | chirpstack | **8080** | Web GUI + gRPC API |
-| chirpstack-rest-api | **8090** | REST API锛堜唬鐞?gRPC锛墊
-| chirpstack-gateway-bridge | **1700/udp** | 鎺ユ敹缃戝叧 UDP 鍖?|
+| chirpstack-rest-api | **8090** | REST API（代理 gRPC）|
+| chirpstack-gateway-bridge | **1700/udp** | 接收网关 UDP 包 |
 | mosquitto | **1883/tcp** | MQTT Broker |
-| redis | 6379 | 鍐呴儴缂撳瓨锛堜笉瀵瑰鏆撮湶锛墊
-| postgres | 5432 | 鎸佷箙鍖栨暟鎹簱锛堜笉瀵瑰鏆撮湶锛墊
+| redis | 6379 | 内部缓存（不对外暴露）|
+| postgres | 5432 | 持久化数据库（不对外暴露）|
 
 ---
 
-## 浜屻€佸叧閿厤缃枃浠惰瑙?
-### 2.1 chirpstack.toml锛圢S 涓婚厤缃級
+## 二、关键配置文件详解
 
-**鍚敤鍖哄煙锛堝繀椤讳笌 gateway-bridge topic_prefix 涓€鑷达級锛?*
+### 2.1 chirpstack.toml（NS 主配置）
+
+**启用区域（必须与 gateway-bridge topic_prefix 一致）：**
 
 ```toml
 [network]
   enabled_regions=[
     "cn470_10",
-    # 鍙互鍚屾椂鍚敤澶氫釜 region锛屾瘡涓?region 鐙珛澶勭悊瀵瑰簲 topic 鐨勬暟鎹?  ]
+    # 可以同时启用多个 region，每个 region 独立处理对应 topic 的数据
+  ]
 ```
 
-**API 鍜?Web UI锛?*
+**API 和 Web UI：**
 
 ```toml
 [api]
   bind="0.0.0.0:8080"
-  secret="your-secret-key"  # JWT 绛惧悕瀵嗛挜锛屾敼鎺夐粯璁ゅ€?```
+  secret="your-secret-key"  # JWT 签名密钥，改掉默认值
+```
 
-**鏁版嵁搴擄細**
+**数据库：**
 
 ```toml
 [postgresql]
@@ -68,9 +78,9 @@ ChirpStack v4 鐩告瘮 v3 鍋氫簡閲嶅ぇ閲嶆瀯锛?
   servers=["redis://redis/"]
 ```
 
-### 2.2 region_cn470_10.toml锛堝尯鍩熼厤缃級
+### 2.2 region_cn470_10.toml（区域配置）
 
-**鏍稿績瀛楁锛?*
+**核心字段：**
 
 ```toml
 [regions.cn470_10]
@@ -80,10 +90,12 @@ ChirpStack v4 鐩告瘮 v3 鍋氫簡閲嶅ぇ閲嶆瀯锛?
     force_gws_private=false
 
   [[regions.cn470_10.network.extra_channels]]
-    # CN470_10 鐨?涓笂琛屼俊閬?    frequency=486300000
+    # CN470_10 的8个上行信道
+    frequency=486300000
     min_dr=0
     max_dr=5
-    # ... 鍏朵綑7涓被浼?
+    # ... 其余7个类似
+
   [regions.cn470_10.network]
     enabled_uplink_channels=[80, 81, 82, 83, 84, 85, 86, 87]
 
@@ -92,22 +104,25 @@ ChirpStack v4 鐩告瘮 v3 鍋氫簡閲嶅ぇ閲嶆瀯锛?
     dr=0
 
   [regions.cn470_10.gateway_topic_prefix]
-    topic_prefix="cn470_10"    # 蹇呴』涓?gateway-bridge 鐨?topic 鍓嶇紑涓€鑷?```
+    topic_prefix="cn470_10"    # 必须与 gateway-bridge 的 topic 前缀一致
+```
 
-### 2.3 docker-compose.yml锛坓ateway-bridge 鍏抽敭閰嶇疆锛?
+### 2.3 docker-compose.yml（gateway-bridge 关键配置）
+
 ```yaml
 chirpstack-gateway-bridge:
   image: chirpstack/chirpstack-gateway-bridge:4
   environment:
-    # 杩欎笁琛岀殑鍓嶇紑蹇呴』涓?region TOML 涓殑 topic_prefix 涓€鑷?    - INTEGRATION__MQTT__EVENT_TOPIC_TEMPLATE=cn470_10/gateway/{{ .GatewayID }}/event/{{ .EventType }}
+    # 这三行的前缀必须与 region TOML 中的 topic_prefix 一致
+    - INTEGRATION__MQTT__EVENT_TOPIC_TEMPLATE=cn470_10/gateway/{{ .GatewayID }}/event/{{ .EventType }}
     - INTEGRATION__MQTT__STATE_TOPIC_TEMPLATE=cn470_10/gateway/{{ .GatewayID }}/state/{{ .StateType }}
     - INTEGRATION__MQTT__COMMAND_TOPIC_TEMPLATE=cn470_10/gateway/{{ .GatewayID }}/command/#
   ports:
-    - "1700:1700/udp"   # 鎺ユ敹缃戝叧 UDP
+    - "1700:1700/udp"   # 接收网关 UDP
 ```
 
-> 鈿狅笍 **甯歌鍧?*锛歒AML 涓暱瀛楃涓蹭笉鑳芥湁鎹㈣锛屾煇浜涚紪杈戝櫒浼氬湪80鍒楄嚜鍔ㄦ姌琛岋紝
-> 瀵艰嚧 template 瀛楃涓茶鎴柇锛宼opic 瑙ｆ瀽澶辫触銆傜敤 Python/sed 淇敼鏇村畨鍏細
+> ⚠️ **常见坑**：YAML 中长字符串不能有换行，某些编辑器会在80列自动折行，
+> 导致 template 字符串被截断，topic 解析失败。用 Python/sed 修改更安全：
 > ```bash
 > python3 -c "
 > content = open('docker-compose.yml').read()
@@ -118,157 +133,200 @@ chirpstack-gateway-bridge:
 
 ---
 
-## 涓夈€佸湪 ChirpStack 涓敞鍐岃澶囷細瀹屾暣娴佺▼涓庡弬鏁拌鏄?
-ChirpStack 娉ㄥ唽涓€鍙版柊璁惧闇€瑕佷緷娆″畬鎴?4 姝ワ紝鍚庨潰鐨勬楠や緷璧栧墠闈㈢殑姝ラ鍒涘缓鐨勫璞★細
+## 三、在 ChirpStack 中注册设备：完整流程与参数说明
+
+ChirpStack 注册一台新设备需要依次完成 4 步，后面的步骤依赖前面的步骤创建的对象：
 
 ```
-鈶?娉ㄥ唽缃戝叧锛圙ateway锛?       鈫?鈶?鍒涘缓璁惧閰嶇疆鏂囦欢锛圖evice Profile锛?       鈫?鈶?鍒涘缓搴旂敤锛圓pplication锛?       鈫?鈶?鍦ㄥ簲鐢ㄥ唴娉ㄥ唽璁惧锛圖evice锛夊苟濉啓瀵嗛挜
+① 注册网关（Gateway）
+       ↓
+② 创建设备配置文件（Device Profile）
+       ↓
+③ 创建应用（Application）
+       ↓
+④ 在应用内注册设备（Device）并填写密钥
 ```
 
 ---
 
-### 3.1 娉ㄥ唽缃戝叧锛圙ateway锛?
-Web UI 鈫?**Gateways** 鈫?**Add gateway**
+### 3.1 注册网关（Gateway）
 
-#### 瀛楁璇存槑
+Web UI → **Gateways** → **Add gateway**
 
-| 瀛楁 | 绀轰緥鍊?| 璇存槑 |
+#### 字段说明
+
+| 字段 | 示例值 | 说明 |
 |------|--------|------|
-| **Name** | `ESXP1302-Lab` | 浠呯敤浜庢樉绀猴紝鏃犲姛鑳藉奖鍝?|
-| **Gateway ID锛圗UI-64锛?* | `AA555A00000021FB` | **鍏抽敭瀛楁**銆?瀛楄妭 EUI锛屽叏灞€鍞竴鏍囪瘑缃戝叧 |
-| Description | 闅忔剰 | 澶囨敞 |
-| Tags | 鍙€?| Key-Value 鍏冩暟鎹紝鍙敤浜庤繃婊?|
+| **Name** | `ESXP1302-Lab` | 仅用于显示，无功能影响 |
+| **Gateway ID（EUI-64）** | `AA555A00000021FB` | **关键字段**。8字节 EUI，全局唯一标识网关 |
+| Description | 随意 | 备注 |
+| Tags | 可选 | Key-Value 元数据，可用于过滤 |
 
-**Gateway ID 浠庡摢鏉ワ紵**  
-鏈伐绋嬪浐浠跺湪鍚姩鏃堕€氳繃 `esp_read_mac()` 璇诲彇 ESP32-S3 WiFi MAC 鍦板潃锛?鎷兼帴鍚庢墦鍗板埌涓插彛 Monitor锛?```
+**Gateway ID 从哪来？**  
+本工程固件在启动时通过 `esp_read_mac()` 读取 ESP32-S3 WiFi MAC 地址，
+拼接后打印到串口 Monitor：
+```
 Gateway EUI: AA:55:5A:00:00:00:21:FB
 ```
-鍘绘帀鍐掑彿鍗充负 `AA555A00000021FB`銆備篃鍙湪 `global_conf.cn490.json` 涓殑
-`gateway_ID` 瀛楁鏌ュ埌銆?
-**娉ㄥ唽鍚庨獙璇侊細**  
-鍑犵鍚庡埛鏂伴〉闈紝**Last seen** 搴旀樉绀哄綋鍓嶆椂闂达紙鑰屼笉鏄?"Never"锛夛紱
-鐘舵€佹寚绀哄彉涓虹豢鑹?**Online**銆傝嫢浠嶆樉绀虹绾匡紝妫€鏌?gateway-bridge 鐨?MQTT topic 鍓嶇紑鏄惁涓?NS region id 涓€鑷达紙瑙佺浜岃妭锛夈€?
+去掉冒号即为 `AA555A00000021FB`。也可在 `global_conf.cn490.json` 中的
+`gateway_ID` 字段查到。
+
+**注册后验证：**  
+几秒后刷新页面，**Last seen** 应显示当前时间（而不是 "Never"）；
+状态指示变为绿色 **Online**。若仍显示离线，检查 gateway-bridge 的
+MQTT topic 前缀是否与 NS region id 一致（见第二节）。
+
 ---
 
-### 3.2 鍒涘缓璁惧閰嶇疆鏂囦欢锛圖evice Profile锛?
-**Device Profile** 瀹氫箟浜?涓€绫昏妭鐐?鐨?LoRaWAN 鍙傛暟锛屽悓鍨嬪彿鐨勫鍙拌澶囧叡浜悓涓€涓?Profile锛屼笉闇€瑕佹瘡鍙板崟鐙缃€?
-Web UI 鈫?**Device profiles** 鈫?**Add device profile**
+### 3.2 创建设备配置文件（Device Profile）
 
-#### General 閫夐」鍗?
-| 瀛楁 | 鎺ㄨ崘鍊?| 璇存槑 |
+**Device Profile** 定义了"一类节点"的 LoRaWAN 参数，同型号的多台设备共享同一个
+Profile，不需要每台单独设置。
+
+Web UI → **Device profiles** → **Add device profile**
+
+#### General 选项卡
+
+| 字段 | 推荐值 | 说明 |
 |------|--------|------|
-| **Name** | `E77-CN470-OTAA` | 鍛藉悕寤鸿鍖呭惈鍨嬪彿+棰戞+鍏ョ綉鏂瑰紡锛屼究浜庡尯鍒?|
-| **Region** | `CN470_10` | **鍏抽敭瀛楁**銆傚繀椤讳笌缃戝叧 radio 棰戠巼瀵瑰簲鐨勫瓙棰戞涓€鑷达紝鏈伐绋嬪浐瀹氶€?CN470_10 |
-| **MAC version** | `LoRaWAN 1.0.3` | **鍏抽敭瀛楁**銆傚繀椤讳笌鑺傜偣鍥轰欢鐗堟湰涓ユ牸鍖归厤銆侲77-400M22S 鍥轰欢涓?LoRaWAN 1.0.3锛岄€夐敊浼氬鑷?MIC 鏍￠獙澶辫触鎴?FCnt 閫昏緫涓嶅吋瀹?|
-| **Regional parameters revision** | `A`锛堝嵆 RP002-1.0.1锛?| 涓?MAC version 閰嶅鐨勫尯鍩熷弬鏁扮増鏈€?.0.3 瀵瑰簲閫?A |
-| **ADR algorithm** | `Default ADR algorithm (LoRa only)` | ChirpStack 鍐呯疆 ADR 绛栫暐锛氭敹闆嗗巻鍙?SNR 鏍锋湰锛岃嚜鍔ㄤ笅鍙?LinkADRReq 璋冩暣 DR 鍜?TxPower銆傞€?Default 鍗冲彲 |
-| **Expected uplink interval** | `3600`锛堢锛?| 棰勬湡鑺傜偣涓婅闂撮殧锛岀敤浜庡垽鏂澶囨槸鍚︽椿璺冿紙瓒呮椂鍚?Device 鐘舵€佸彉涓?inactive锛夈€傛祴璇曟椂鍙～杈冨皬鍊煎 `120` |
-| **Device-status request interval** | `0`锛堢鐢級| 鑷姩鍙?DevStatusReq 鏌ョ數姹犲拰 SNR 鐨勯棿闅旓紝0 = 绂佺敤銆傛祴璇曚笉闇€瑕佸紑 |
+| **Name** | `E77-CN470-OTAA` | 命名建议包含型号+频段+入网方式，便于区分 |
+| **Region** | `CN470_10` | **关键字段**。必须与网关 radio 频率对应的子频段一致，本工程固定选 CN470_10 |
+| **MAC version** | `LoRaWAN 1.0.3` | **关键字段**。必须与节点固件版本严格匹配。E77-400M22S 固件为 LoRaWAN 1.0.3，选错会导致 MIC 校验失败或 FCnt 逻辑不兼容 |
+| **Regional parameters revision** | `A`（即 RP002-1.0.1） | 与 MAC version 配套的区域参数版本。1.0.3 对应选 A |
+| **ADR algorithm** | `Default ADR algorithm (LoRa only)` | ChirpStack 内置 ADR 策略：收集历史 SNR 样本，自动下发 LinkADRReq 调整 DR 和 TxPower。选 Default 即可 |
+| **Expected uplink interval** | `3600`（秒） | 预期节点上行间隔，用于判断设备是否活跃（超时后 Device 状态变为 inactive）。测试时可填较小值如 `120` |
+| **Device-status request interval** | `0`（禁用）| 自动发 DevStatusReq 查电池和 SNR 的间隔，0 = 禁用。测试不需要开 |
 
-#### Join (OTAA) 閫夐」鍗?
-| 瀛楁 | 鍊?| 璇存槑 |
+#### Join (OTAA) 选项卡
+
+| 字段 | 值 | 说明 |
 |------|----|------|
-| **Supports OTAA** | 鉁?鍕鹃€?| 琛ㄧず姝?Profile 鐨勮澶囦娇鐢?OTAA 鍏ョ綉銆侽TAA 浼樹簬 ABP锛氭瘡娆″叆缃戝姩鎬佹淳鍙?DevAddr 鍜?Session Key锛岄槻閲嶆斁鏀诲嚮 |
+| **Supports OTAA** | ✅ 勾选 | 表示此 Profile 的设备使用 OTAA 入网。OTAA 优于 ABP：每次入网动态派发 DevAddr 和 Session Key，防重放攻击 |
 
-#### Class B / Class C 閫夐」鍗?
-| 瀛楁 | 鍊?| 璇存槑 |
+#### Class B / Class C 选项卡
+
+| 字段 | 值 | 说明 |
 |------|----|------|
-| Supports Class B | 涓嶅嬀 | Class B 闇€瑕佺綉鍏冲悓姝?Beacon锛岀洰鍓嶆湭娴嬭瘯 |
-| Supports Class C | 涓嶅嬀 | Class C 鑺傜偣甯稿紑鎺ユ敹绐楀彛锛屽姛鑰楅珮锛岄渶瑕佽妭鐐瑰浐浠舵敮鎸併€侲77 鍏ョ綉鍚庡彲閫氳繃 `AT+CCLASS=C` 鍒囨崲锛屽眾鏃跺啀鍒涘缓鍗曠嫭 Profile |
+| Supports Class B | 不勾 | Class B 需要网关同步 Beacon，目前未测试 |
+| Supports Class C | 不勾 | Class C 节点常开接收窗口，功耗高，需要节点固件支持。E77 入网后可通过 `AT+CCLASS=C` 切换，届时再创建单独 Profile |
 
-#### Codec 閫夐」鍗?
-| 瀛楁 | 璇存槑 |
+#### Codec 选项卡
+
+| 字段 | 说明 |
 |------|------|
-| Payload codec | 鐢ㄤ簬鍦?GUI 涓嚜鍔ㄨВ鐮?payload銆傞€?`None` 鍒欐樉绀哄師濮?hex锛涢€?`CayenneLPP` 鍒欒嚜鍔ㄨВ鏋愪紶鎰熷櫒鏁版嵁鏍煎紡锛涗篃鍙～鑷畾涔?JavaScript 瑙ｇ爜鍣?|
+| Payload codec | 用于在 GUI 中自动解码 payload。选 `None` 则显示原始 hex；选 `CayenneLPP` 则自动解析传感器数据格式；也可填自定义 JavaScript 解码器 |
 
-> **灏忕粨**锛欴evice Profile 鎻忚堪鐨勬槸鑺傜偣"鑳藉仛浠€涔?锛堢増鏈€丆lass銆丄DR 鏀寔锛夛紝
-> 涓嶆秹鍙婂叿浣撶殑 DevEUI / AppKey锛屽彲浠ヨ澶氬彴鍚屽瀷鍙疯澶囧鐢ㄣ€?
+> **小结**：Device Profile 描述的是节点"能做什么"（版本、Class、ADR 支持），
+> 不涉及具体的 DevEUI / AppKey，可以被多台同型号设备复用。
+
 ---
 
-### 3.3 鍒涘缓搴旂敤锛圓pplication锛?
-**Application** 鏄澶囩殑閫昏緫鍒嗙粍瀹瑰櫒銆傚悓涓€搴旂敤鍐呯殑璁惧鍏变韩锛?- 鍚屼竴涓?MQTT uplink topic锛坄application/<id>/device/+/event/up`锛?- 鍚屼竴濂?HTTP integration / webhook 閰嶇疆
-- 鍚屼竴涓?API 閴存潈瑙嗗浘
+### 3.3 创建应用（Application）
 
-Web UI 鈫?**Applications** 鈫?**Add application**
+**Application** 是设备的逻辑分组容器。同一应用内的设备共享：
+- 同一个 MQTT uplink topic（`application/<id>/device/+/event/up`）
+- 同一套 HTTP integration / webhook 配置
+- 同一个 API 鉴权视图
 
-| 瀛楁 | 璇存槑 |
+Web UI → **Applications** → **Add application**
+
+| 字段 | 说明 |
 |------|------|
-| **Name** | 濡?`GW-Validation-Test` |
-| Description | 闅忔剰 |
-| Tags | 鍙€?Key-Value 鍏冩暟鎹?|
+| **Name** | 如 `GW-Validation-Test` |
+| Description | 随意 |
+| Tags | 可选 Key-Value 元数据 |
 
-> 鐢熶骇鍦烘櫙涓竴涓笟鍔＄郴缁熷搴斾竴涓?Application锛?> 璋冭瘯鍦烘櫙涓€鑸竴涓」鐩缓涓€涓?Application 鍗冲彲銆?
+> 生产场景中一个业务系统对应一个 Application；
+> 调试场景一般一个项目建一个 Application 即可。
+
 ---
 
-### 3.4 娉ㄥ唽璁惧锛圖evice锛夊苟濉啓瀵嗛挜
+### 3.4 注册设备（Device）并填写密钥
 
-鍦?Application 鍐呬负姣忓彴鐗╃悊鑺傜偣鍒涘缓涓€涓?Device 鏉＄洰銆?
-**璺緞锛?* Web UI 鈫?**Applications** 鈫?閫夋嫨搴旂敤 鈫?**Add device**
+在 Application 内为每台物理节点创建一个 Device 条目。
 
-#### General 閫夐」鍗?
-| 瀛楁 | 绀轰緥鍊?| 璇存槑 |
+**路径：** Web UI → **Applications** → 选择应用 → **Add device**
+
+#### General 选项卡
+
+| 字段 | 示例值 | 说明 |
 |------|--------|------|
-| **Name** | `E77-Node-01` | 鏄剧ず鍚嶏紝闅忔剰 |
-| **DevEUI** | `AABBCCDD11223344` | **鍏抽敭瀛楁**銆?瀛楄妭鍏ㄥ眬鍞竴璁惧鏍囪瘑绗︼紝鐑у啓鍦ㄨ妭鐐硅姱鐗囧唴锛岄€氳繃 `AT+CDEVEUI=?` 鏌ヨ |
-| **AppEUI锛圝oinEUI锛?* | `0000000000000000` | 鏍囪瘑 Join Server 鐨?8瀛楄妭 EUI銆侺oRaWAN 1.0.x 绉?AppEUI锛?.1 绉?JoinEUI銆傝嚜寤烘祴璇曞叏濉?0 鍗冲彲锛涚敓浜у満鏅敱閮ㄧ讲鏂瑰垎閰?|
-| **Device profile** | 閫夋嫨姝ラ 3.2 鍒涘缓鐨?Profile | 鍐冲畾 MAC 鐗堟湰銆丷egion銆丄DR 绛?|
-| **Skip frame-counter checks** | 璋冭瘯鏈熼棿鍕鹃€?| **璋冭瘯蹇呭嬀**銆備笉鍕炬椂鑻ヨ妭鐐归噸鐑у悗 FCnt 浠?0 閲嶇疆锛孨S 浼氬洜涓?FCnt 鍥為€€鑰屾嫆缁濇墍鏈変笂琛屽寘锛堥槻閲嶆斁淇濇姢锛夈€傜敓浜х幆澧冧笉鍕?|
-| Tags | 鍙€?| |
-| Variables | 鍙€?| 鍙湪 JS codec 涓紩鐢ㄧ殑鑷畾涔夊彉閲?|
+| **Name** | `E77-Node-01` | 显示名，随意 |
+| **DevEUI** | `AABBCCDD11223344` | **关键字段**。8字节全局唯一设备标识符，烧写在节点芯片内，通过 `AT+CDEVEUI=?` 查询 |
+| **AppEUI（JoinEUI）** | `0000000000000000` | 标识 Join Server 的 8字节 EUI。LoRaWAN 1.0.x 称 AppEUI，1.1 称 JoinEUI。自建测试全填 0 即可；生产场景由部署方分配 |
+| **Device profile** | 选择步骤 3.2 创建的 Profile | 决定 MAC 版本、Region、ADR 等 |
+| **Skip frame-counter checks** | 调试期间勾选 | **调试必勾**。不勾时若节点重烧后 FCnt 从 0 重置，NS 会因为 FCnt 回退而拒绝所有上行包（防重放保护）。生产环境不勾 |
+| Tags | 可选 | |
+| Variables | 可选 | 可在 JS codec 中引用的自定义变量 |
 
-**DevEUI 浠庡摢鏉ワ紵**  
-瀵逛簬 E77-400M22S锛岄€氳繃 AT 鎸囦护鏌ヨ锛?```bash
+**DevEUI 从哪来？**  
+对于 E77-400M22S，通过 AT 指令查询：
+```bash
 python3 scripts/e77_node_ctrl.py query --port /dev/ttyUSB0
-# 鎴栫洿鎺ュ彂 AT 鎸囦护锛?AT+CDEVEUI=?
-# 鈫?杩斿洖: AT+CDEVEUI=AABBCCDD11223344
+# 或直接发 AT 指令：
+AT+CDEVEUI=?
+# → 返回: AT+CDEVEUI=AABBCCDD11223344
 ```
-姣忓潡妯″潡鍑哄巶鐑у啓鍞竴 DevEUI锛屼笉鑳戒慨鏀广€?
+每块模块出厂烧写唯一 DevEUI，不能修改。
+
 ---
 
-#### 濉啓瀵嗛挜锛圤TAA锛?
-鐐瑰嚮 **Submit** 娣诲姞璁惧鍚庯紝鑷姩璺宠浆鍒拌澶囪鎯呴〉銆? 
-杩涘叆 **Keys (OTAA)** 鏍囩椤碉細
+#### 填写密钥（OTAA）
 
-| 瀛楁 | 瀛楄妭鏁?| 璇存槑 |
+点击 **Submit** 添加设备后，自动跳转到设备详情页。  
+进入 **Keys (OTAA)** 标签页：
+
+| 字段 | 字节数 | 说明 |
 |------|--------|------|
-| **Application key锛圓ppKey锛?* | 16B | **鏈€鍏抽敭鐨勫瘑閽?*銆傝妭鐐逛晶鍜?NS 渚у叡鍚屾寔鏈夛紝鐢ㄤ簬鎺ㄥ鎵€鏈?Session Key銆傚繀椤讳笌鑺傜偣鍥轰欢涓儳鍐欑殑 AppKey 瀹屽叏涓€鑷达紙澶у皬鍐欎笉鏁忔劅锛?|
-| **NwkKey**锛堜粎 1.1锛墊 16B | LoRaWAN 1.1 鏂板鐨勭綉缁滃瘑閽ワ紝涓?AppKey 鍒嗙銆?.0.x 璁惧鏃犳瀛楁 |
+| **Application key（AppKey）** | 16B | **最关键的密钥**。节点侧和 NS 侧共同持有，用于推导所有 Session Key。必须与节点固件中烧写的 AppKey 完全一致（大小写不敏感） |
+| **NwkKey**（仅 1.1）| 16B | LoRaWAN 1.1 新增的网络密钥，与 AppKey 分离。1.0.x 设备无此字段 |
 
-**AppKey 鏄粈涔堬紝涓轰粈涔堥噸瑕侊紵**
+**AppKey 是什么，为什么重要？**
 
-AppKey 鏄牴瀵嗛挜锛圧oot Key锛夛紝OTAA 鍏ョ綉鏃讹細
+AppKey 是根密钥（Root Key），OTAA 入网时：
 ```
 NwkSKey = aes128_encrypt(AppKey, 0x01 || AppNonce || NetID || DevNonce || pad)
 AppSKey = aes128_encrypt(AppKey, 0x02 || AppNonce || NetID || DevNonce || pad)
 ```
-- `NwkSKey`锛圢etwork Session Key锛夛細鐢ㄤ簬 MAC 灞傚抚鐨?MIC 璁＄畻鍜屽姞瑙ｅ瘑
-- `AppSKey`锛圓pplication Session Key锛夛細鐢ㄤ簬搴旂敤 payload 鐨勫姞瑙ｅ瘑
+- `NwkSKey`（Network Session Key）：用于 MAC 层帧的 MIC 计算和加解密
+- `AppSKey`（Application Session Key）：用于应用 payload 的加解密
 
-AppKey 娉勯湶 = Session Key 鍙鎺ㄧ畻 = 鎵€鏈夊巻鍙插拰鏈潵鏁版嵁琚В瀵嗐€?**涓嶅悓璁惧蹇呴』浣跨敤涓嶅悓鐨?AppKey**锛堝嚭鍘傛椂鍚勮嚜鐢熸垚锛屾垨鐢?NS 鎵归噺鐢熸垚鍚庣儳鍐欙級銆?
-娴嬭瘯鏃跺彲鍦?ChirpStack 璁惧璇︽儏椤电偣鍑?**Generate** 鎸夐挳闅忔満鐢熸垚锛?鐒跺悗灏嗙敓鎴愮殑 32 浣?hex 瀛楃涓插～鍏ヨ妭鐐?`--appkey` 鍙傛暟銆?
+AppKey 泄露 = Session Key 可被推算 = 所有历史和未来数据被解密。
+**不同设备必须使用不同的 AppKey**（出厂时各自生成，或由 NS 批量生成后烧写）。
+
+测试时可在 ChirpStack 设备详情页点击 **Generate** 按钮随机生成，
+然后将生成的 32 位 hex 字符串填入节点 `--appkey` 参数。
+
 ---
 
-#### 濉啓瀵嗛挜锛圓BP锛?
-ABP 涓嶆墽琛?Join 娴佺▼锛孲ession Key 鐩存帴棰勭疆锛岄渶瑕佹墜鍔ㄥ～鍐欐縺娲诲弬鏁般€?
-杩涘叆 **Activation** 鏍囩椤碉細
+#### 填写密钥（ABP）
 
-| 瀛楁 | 瀛楄妭鏁?| 璇存槑 |
+ABP 不执行 Join 流程，Session Key 直接预置，需要手动填写激活参数。
+
+进入 **Activation** 标签页：
+
+| 字段 | 字节数 | 说明 |
 |------|--------|------|
-| **Device address锛圖evAddr锛?* | 4B | 缃戠粶鍐呭敮涓€鍦板潃锛孉BP 鏃剁敱鐢ㄦ埛鑷畾锛屽 `26011234`銆侽TAA 鏃剁敱 NS 鍔ㄦ€佸垎閰嶏紝鏃犻渶鎵嬪～ |
-| **NwkSEncKey** | 16B | LoRaWAN 1.1锛氱綉缁滃眰鍔犲瘑 Session Key锛?.0.x 涓瓑鍚屼簬 NwkSKey锛?|
-| **SNwkSIntKey** | 16B | LoRaWAN 1.1锛氭湇鍔″櫒渚х綉缁滃眰瀹屾暣鎬?Key锛?.0.x 涓?NwkSKey 鐩稿悓锛?|
-| **FNwkSIntKey** | 16B | LoRaWAN 1.1锛氳浆鍙戜晶缃戠粶灞傚畬鏁存€?Key锛?.0.x 涓?NwkSKey 鐩稿悓锛?|
-| **AppSKey** | 16B | 搴旂敤灞?Session Key锛岀敤浜?payload 鍔犺В瀵?|
-| **Uplink frame-counter锛團CntUp锛?* | 4B int | 鑺傜偣涓婅甯ц鏁板櫒鍒濆鍊笺€傞€氬父濉?`0`锛屼笌鑺傜偣渚у悓姝?|
-| **Downlink frame-counter锛圢FCntDown锛?* | 4B int | NS 涓嬭甯ц鏁板櫒鍒濆鍊硷紝閫氬父 `0` |
+| **Device address（DevAddr）** | 4B | 网络内唯一地址，ABP 时由用户自定，如 `26011234`。OTAA 时由 NS 动态分配，无需手填 |
+| **NwkSEncKey** | 16B | LoRaWAN 1.1：网络层加密 Session Key（1.0.x 中等同于 NwkSKey） |
+| **SNwkSIntKey** | 16B | LoRaWAN 1.1：服务器侧网络层完整性 Key（1.0.x 与 NwkSKey 相同） |
+| **FNwkSIntKey** | 16B | LoRaWAN 1.1：转发侧网络层完整性 Key（1.0.x 与 NwkSKey 相同） |
+| **AppSKey** | 16B | 应用层 Session Key，用于 payload 加解密 |
+| **Uplink frame-counter（FCntUp）** | 4B int | 节点上行帧计数器初始值。通常填 `0`，与节点侧同步 |
+| **Downlink frame-counter（NFCntDown）** | 4B int | NS 下行帧计数器初始值，通常 `0` |
 
-> **ABP 娉ㄦ剰**锛欰BP Session Key 鏄潤鎬佺殑锛屾案涓嶆洿鏂帮紝瀹夊叏鎬т綆浜?OTAA銆?> 涓?FCntUp 涓€鏃﹁秴杩囦笂闄愶紙2^32锛夋垨璁惧閲嶇儳锛團CntUp 褰掗浂锛夛紝
-> 鑻?NS 鏈叧闂?FCnt 妫€鏌ワ紝鎵€鏈夊寘浼氳涓㈠純銆?> **璋冭瘯 ABP 鏃跺姟蹇呭嬀閫?Skip frame-counter checks**锛?> 骞跺湪 Device Profile 涓叧闂?FCnt rollover 妫€鏌ャ€?
+> **ABP 注意**：ABP Session Key 是静态的，永不更新，安全性低于 OTAA。
+> 且 FCntUp 一旦超过上限（2^32）或设备重烧（FCntUp 归零），
+> 若 NS 未关闭 FCnt 检查，所有包会被丢弃。
+> **调试 ABP 时务必勾选 Skip frame-counter checks**，
+> 并在 Device Profile 中关闭 FCnt rollover 检查。
+
 ---
 
-### 3.5 楠岃瘉璁惧娉ㄥ唽鎴愬姛
+### 3.5 验证设备注册成功
 
-娉ㄥ唽骞跺～鍐欏瘑閽ュ悗锛岃繍琛岃妭鐐硅剼鏈Е鍙?OTAA 鍏ョ綉锛?
+注册并填写密钥后，运行节点脚本触发 OTAA 入网：
+
 ```bash
 python3 scripts/e77_node_ctrl.py otaa \
     --port /dev/ttyUSB0 --region 2 \
@@ -276,168 +334,198 @@ python3 scripts/e77_node_ctrl.py otaa \
     --chanmask 0000:0000:0000:0000:0000:00FF
 ```
 
-**鎴愬姛鏍囧織锛堟寜椤哄簭锛夛細**
+**成功标志（按顺序）：**
 
-| 搴忓彿 | 瑙傚療浣嶇疆 | 棰勬湡鐜拌薄 |
+| 序号 | 观察位置 | 预期现象 |
 |------|---------|---------|
-| 1 | 鑺傜偣涓插彛 | `+EVT:JOINED` |
-| 2 | ChirpStack GUI 鈫?Device 鈫?**Events** | 鍑虹幇 `join` 浜嬩欢 |
-| 3 | GUI 鈫?Device 鈫?**Activation** | 鏄剧ず褰撳墠 DevAddr / NwkSKey / AppSKey |
-| 4 | 鍙戦€佷笂琛屽悗 鈫?**LoRaWAN frames** | 鍑虹幇 `UnconfirmedDataUp` 甯э紝payload 宸茶В瀵?|
-| 5 | **Events** 鏍囩 | 鍑虹幇 `up` 浜嬩欢锛宒ata 瀛楁鏄剧ず base64 payload |
+| 1 | 节点串口 | `+EVT:JOINED` |
+| 2 | ChirpStack GUI → Device → **Events** | 出现 `join` 事件 |
+| 3 | GUI → Device → **Activation** | 显示当前 DevAddr / NwkSKey / AppSKey |
+| 4 | 发送上行后 → **LoRaWAN frames** | 出现 `UnconfirmedDataUp` 帧，payload 已解密 |
+| 5 | **Events** 标签 | 出现 `up` 事件，data 字段显示 base64 payload |
 
 ---
 
-## 鍥涖€丱TAA 鍏ョ綉娴佺▼锛圝oin锛?
-OTAA锛圤ver-The-Air Activation锛夋槸鎺ㄨ崘鐨勫叆缃戞柟寮忥細
+## 四、OTAA 入网流程（Join）
+
+OTAA（Over-The-Air Activation）是推荐的入网方式：
 
 ```
-鑺傜偣                            NS (ChirpStack)
- 鈹? 鈹傗攢鈹€ JoinRequest锛堝惈 AppEUI/DevEUI/DevNonce锛夆攢鈹€鈫? 鈹?                                             鈹?鏌?AppKey锛岄獙璇?MIC
- 鈹?                                             鈹?鐢熸垚 NwkSKey, AppSKey
- 鈹?                                             鈹?鍒嗛厤 DevAddr
- 鈹傗啇鈹€鈹€ JoinAccept锛堝惈 AppNonce/NetID/DevAddr锛夆攢鈹€鈹? 鈹? 鈹?鑺傜偣鐢?AppKey 瑙ｅ瘑 JoinAccept锛? 鈹?鎺ㄥ鍑?NwkSKey / AppSKey锛? 鈹?姝ゅ悗涓婅鏁版嵁鐢ㄨ繖涓や釜 Session Key 鍔犲瘑
+节点                            NS (ChirpStack)
+ │
+ │── JoinRequest（含 AppEUI/DevEUI/DevNonce）──→
+ │                                              │ 查 AppKey，验证 MIC
+ │                                              │ 生成 NwkSKey, AppSKey
+ │                                              │ 分配 DevAddr
+ │←── JoinAccept（含 AppNonce/NetID/DevAddr）──│
+ │
+ │ 节点用 AppKey 解密 JoinAccept，
+ │ 推导出 NwkSKey / AppSKey，
+ │ 此后上行数据用这两个 Session Key 加密
 ```
 
-**鍏抽敭鍙傛暟锛?*
+**关键参数：**
 
-| 鍙傛暟 | 澶у皬 | 瀛樺偍浣嶇疆 |
+| 参数 | 大小 | 存储位置 |
 |------|------|---------|
-| DevEUI | 8B | 鑺傜偣纭欢锛堥€氬父鐑у啓锛墊
-| AppKey | 16B | 鑺傜偣鍥轰欢 + ChirpStack |
-| DevAddr | 4B | NS 鍔ㄦ€佸垎閰?|
-| NwkSKey | 16B | 鎺ㄥ鑷?AppKey锛堟瘡娆?Join 鏇存柊锛墊
-| AppSKey | 16B | 鎺ㄥ鑷?AppKey锛堟瘡娆?Join 鏇存柊锛墊
+| DevEUI | 8B | 节点硬件（通常烧写）|
+| AppKey | 16B | 节点固件 + ChirpStack |
+| DevAddr | 4B | NS 动态分配 |
+| NwkSKey | 16B | 推导自 AppKey（每次 Join 更新）|
+| AppSKey | 16B | 推导自 AppKey（每次 Join 更新）|
 
 ---
 
-## 浜斻€佹棩蹇楁煡鐪嬩笌璋冭瘯
+## 五、日志查看与调试
 
-### 5.1 鏌ョ湅瀹炴椂鏃ュ織
+### 5.1 查看实时日志
 
 ```bash
 cd ~/chirpstack-docker
 
-# 鏌ョ湅 NS 鏃ュ織锛堟渶甯哥敤锛?docker compose logs -f chirpstack
+# 查看 NS 日志（最常用）
+docker compose logs -f chirpstack
 
-# 鏌ョ湅 gateway-bridge 鏃ュ織
+# 查看 gateway-bridge 日志
 docker compose logs -f chirpstack-gateway-bridge
 
-# 鏌ョ湅鎵€鏈夊鍣?docker compose logs -f
+# 查看所有容器
+docker compose logs -f
 
-# 鏌ョ湅鏈€杩?N 鍒嗛挓
+# 查看最近 N 分钟
 docker compose logs --since=5m chirpstack
 ```
 
-### 5.2 鍏抽敭鏃ュ織鍏抽敭瀛?
-| 鍏抽敭瀛?| 鍚箟 |
+### 5.2 关键日志关键字
+
+| 关键字 | 含义 |
 |--------|------|
-| `Gateway partially updated` | NS 鏀跺埌 stats锛岀綉鍏充笂绾?鉁?|
-| `Uplink received` | 鏀跺埌涓婅鍖?鉁?|
-| `region_id="cn470_10"` | 娑堟伅灞炰簬 cn470_10 region 鉁?|
-| `MACPayload requires at least 7 bytes` | 涓婅鍖呬笉鏄悎娉?LoRaWAN 甯э紙瑁?LoRa 鍖咃級鈿狅笍 |
-| `MIC error` | MIC 鏍￠獙澶辫触锛孉ppKey/NwkSKey 涓嶅 鉂?|
-| `DevAddr not found` | 璁惧鏈敞鍐屾垨 DevAddr 閿欒 鉂?|
-| `frame-counter did not increment` | FCnt 璁℃暟鍣ㄦ湭閫掑锛堥噸鏀炬敾鍑婚槻鎶よЕ鍙戯級鉂?|
+| `Gateway partially updated` | NS 收到 stats，网关上线 ✅ |
+| `Uplink received` | 收到上行包 ✅ |
+| `region_id="cn470_10"` | 消息属于 cn470_10 region ✅ |
+| `MACPayload requires at least 7 bytes` | 上行包不是合法 LoRaWAN 帧（裸 LoRa 包）⚠️ |
+| `MIC error` | MIC 校验失败，AppKey/NwkSKey 不对 ❌ |
+| `DevAddr not found` | 设备未注册或 DevAddr 错误 ❌ |
+| `frame-counter did not increment` | FCnt 计数器未递增（重放攻击防护触发）❌ |
 
-### 5.3 MQTT 瀹炴椂鐩戝惉锛堣皟璇?topic锛?
+### 5.3 MQTT 实时监听（调试 topic）
+
 ```bash
-# 瀹夎 mosquitto 瀹㈡埛绔?sudo apt install mosquitto-clients
+# 安装 mosquitto 客户端
+sudo apt install mosquitto-clients
 
-# 璁㈤槄鎵€鏈?cn470_10 缃戝叧娑堟伅锛堜粠瀹夸富鏈鸿闂?Docker 鐨?mosquitto锛?mosquitto_sub -h localhost -p 1883 -t "cn470_10/#" -v
+# 订阅所有 cn470_10 网关消息（从宿主机访问 Docker 的 mosquitto）
+mosquitto_sub -h localhost -p 1883 -t "cn470_10/#" -v
 
-# 鍙湅涓婅鏁版嵁
+# 只看上行数据
 mosquitto_sub -h localhost -p 1883 -t "cn470_10/gateway/+/event/up" -v
 ```
 
-> Gateway Bridge 鍙戝竷鐨勬秷鎭槸 **Protobuf 搴忓垪鍖?*鐨勶紝
-> 鐩存帴 `mosquitto_sub` 鐪嬪埌鐨勬槸浜岃繘鍒讹紝闇€瑕?protobuf 宸ュ叿瑙ｇ爜锛?> 鎴栬€呴€氳繃 ChirpStack Web GUI 鐨勮澶?LoRaWAN frames 椤甸潰鏌ョ湅瑙ｇ爜鍚庣殑鍐呭銆?
-### 5.4 Web GUI 鏌ョ湅涓婅甯?
-Web UI 鈫?**Applications** 鈫?閫夋嫨搴旂敤 鈫?**Devices** 鈫?閫夋嫨璁惧 鈫?**LoRaWAN frames** 鏍囩
+> Gateway Bridge 发布的消息是 **Protobuf 序列化**的，
+> 直接 `mosquitto_sub` 看到的是二进制，需要 protobuf 工具解码，
+> 或者通过 ChirpStack Web GUI 的设备 LoRaWAN frames 页面查看解码后的内容。
 
-杩欓噷浼氭樉绀猴細
-- 甯ф椂闂?- 鎺ユ敹缃戝叧锛堝缃戝叧鏃舵樉绀烘墍鏈夌綉鍏?EUI 鍜?RSSI/SNR锛?- 涓婅甯х被鍨嬶紙JoinRequest / UnconfirmedDataUp 绛夛級
-- 瑙ｅ瘑鍚庣殑 payload锛堝鏋?AppSKey 姝ｇ‘锛?
+### 5.4 Web GUI 查看上行帧
+
+Web UI → **Applications** → 选择应用 → **Devices** → 选择设备 → **LoRaWAN frames** 标签
+
+这里会显示：
+- 帧时间
+- 接收网关（多网关时显示所有网关 EUI 和 RSSI/SNR）
+- 上行帧类型（JoinRequest / UnconfirmedDataUp 等）
+- 解密后的 payload（如果 AppSKey 正确）
+
 ---
 
-## 鍏€佸父瑙佹搷浣滃懡浠?
-### 6.1 瀹瑰櫒绠＄悊
+## 六、常见操作命令
+
+### 6.1 容器管理
 
 ```bash
 cd ~/chirpstack-docker
 
-# 鍚姩鎵€鏈夋湇鍔?docker compose up -d
+# 启动所有服务
+docker compose up -d
 
-# 鍋滄鎵€鏈夋湇鍔?docker compose down
+# 停止所有服务
+docker compose down
 
-# 閲嶅惎鍗曚釜鏈嶅姟锛堜笉褰卞搷鍏朵粬瀹瑰櫒锛?docker compose up -d --no-deps chirpstack-gateway-bridge
+# 重启单个服务（不影响其他容器）
+docker compose up -d --no-deps chirpstack-gateway-bridge
 
-# 閲嶆柊鍔犺浇閰嶇疆锛堜慨鏀?TOML 鍚庨渶閲嶅惎 chirpstack 瀹瑰櫒锛?docker compose restart chirpstack
+# 重新加载配置（修改 TOML 后需重启 chirpstack 容器）
+docker compose restart chirpstack
 
-# 鏌ョ湅瀹瑰櫒鐘舵€?docker compose ps
+# 查看容器状态
+docker compose ps
 ```
 
-### 6.2 REST API 甯哥敤璇锋眰
+### 6.2 REST API 常用请求
 
-ChirpStack 鎻愪緵瀹屾暣 REST API锛堥€氳繃 chirpstack-rest-api 浠ｇ悊锛岀鍙?8090锛夛細
+ChirpStack 提供完整 REST API（通过 chirpstack-rest-api 代理，端口 8090）：
 
 ```bash
 BASE="http://localhost:8090"
-# 鍏堣幏鍙?API Key锛圵eb UI 鈫?API Keys 鈫?Add API key锛屾垨浣跨敤 admin 瀵嗙爜鐩存帴鐧诲綍锛?TOKEN="Bearer <your-api-key>"
+# 先获取 API Key（Web UI → API Keys → Add API key，或使用 admin 密码直接登录）
+TOKEN="Bearer <your-api-key>"
 
-# 鍒楀嚭缃戝叧
+# 列出网关
 curl -H "Authorization: $TOKEN" $BASE/api/gateways
 
-# 鏌ョ湅缃戝叧璇︽儏锛堟浛鎹?EUI锛?curl -H "Authorization: $TOKEN" "$BASE/api/gateways/aa555a00000021fb"
+# 查看网关详情（替换 EUI）
+curl -H "Authorization: $TOKEN" "$BASE/api/gateways/aa555a00000021fb"
 
-# 鍒楀嚭 Device Profile
+# 列出 Device Profile
 curl -H "Authorization: $TOKEN" $BASE/api/device-profiles
 ```
 
 ---
 
-## 涓冦€佸 Region 鍚屾椂杩愯
+## 七、多 Region 同时运行
 
-ChirpStack v4 鏀寔鍦ㄥ悓涓€瀹炰緥涓繍琛屽涓?Region锛屾瘡涓?Region 鐙珛澶勭悊锛?
-**chirpstack.toml锛?*
+ChirpStack v4 支持在同一实例中运行多个 Region，每个 Region 独立处理：
+
+**chirpstack.toml：**
 ```toml
 [network]
   enabled_regions=["cn470_10", "eu868", "us915"]
 ```
 
-**docker-compose.yml 闇€瑕佸涓?gateway-bridge 瀹炰緥锛?*
+**docker-compose.yml 需要多个 gateway-bridge 实例：**
 
 ```yaml
-  # CN470_10 缃戝叧
+  # CN470_10 网关
   chirpstack-gateway-bridge-cn470:
     environment:
       - INTEGRATION__MQTT__EVENT_TOPIC_TEMPLATE=cn470_10/gateway/{{ .GatewayID }}/event/{{ .EventType }}
     ports:
       - "1700:1700/udp"
 
-  # EU868 缃戝叧
+  # EU868 网关
   chirpstack-gateway-bridge-eu868:
     environment:
       - INTEGRATION__MQTT__EVENT_TOPIC_TEMPLATE=eu868/gateway/{{ .GatewayID }}/event/{{ .EventType }}
     ports:
-      - "1701:1700/udp"   # 娉ㄦ剰绔彛涓嶈兘鍐茬獊
+      - "1701:1700/udp"   # 注意端口不能冲突
 ```
 
 ---
 
-## 鍏€佹敞鎰忎簨椤规眹鎬?
-| 娉ㄦ剰鐐?| 璇存槑 |
+## 八、注意事项汇总
+
+| 注意点 | 说明 |
 |--------|------|
-| topic_prefix 澶у皬鍐欐晱鎰?| `CN470_10` 鈮?`cn470_10`锛屽繀椤诲皬鍐?|
-| YAML 涓嶈兘鎹㈣ | 闀垮瓧绗︿覆妯℃澘涓嶈兘璺ㄨ锛屽惁鍒欒鎴柇 |
-| GW EUI 澶у皬鍐?| gateway-bridge 鍙戝竷鏃惰浆鎴愬皬鍐欙紝NS 瀛樺偍鏃朵笉鍖哄垎澶у皬鍐?|
-| FCnt 妫€鏌?| 璋冭瘯鏈熼棿鍙叧闂紝鍚﹀垯閲嶇儳鑺傜偣鍚?FCnt 浠庡ご寮€濮嬩細瀵艰嚧鍖呰涓?|
-| LoRaWAN 1.0 vs 1.1 | Device Profile 鐨?MAC version 蹇呴』涓庤妭鐐瑰浐浠朵竴鑷?|
-| ADR 鍜屼俊閬撴帺鐮?| NS 浼氶€氳繃 ADRReq 鍜?LinkADRReq 涓嬭鍛戒护璋冩暣鑺傜偣淇￠亾锛屽垵娆℃帴鍏ュ彲鑳介渶瑕佸嚑娆′笂琛屾墠绋冲畾 |
+| topic_prefix 大小写敏感 | `CN470_10` ≠ `cn470_10`，必须小写 |
+| YAML 不能换行 | 长字符串模板不能跨行，否则被截断 |
+| GW EUI 大小写 | gateway-bridge 发布时转成小写，NS 存储时不区分大小写 |
+| FCnt 检查 | 调试期间可关闭，否则重烧节点后 FCnt 从头开始会导致包被丢 |
+| LoRaWAN 1.0 vs 1.1 | Device Profile 的 MAC version 必须与节点固件一致 |
+| ADR 和信道掩码 | NS 会通过 ADRReq 和 LinkADRReq 下行命令调整节点信道，初次接入可能需要几次上行才稳定 |
 
 ---
 
-## 鍙傝€冭祫鏂?
-- ChirpStack 瀹樻柟鏂囨。锛歨ttps://www.chirpstack.io/docs/
-- ChirpStack GitHub锛歨ttps://github.com/chirpstack/chirpstack
-- Docker 閮ㄧ讲绀轰緥锛歨ttps://github.com/chirpstack/chirpstack-docker
+## 参考资料
+
+- ChirpStack 官方文档：https://www.chirpstack.io/docs/
+- ChirpStack GitHub：https://github.com/chirpstack/chirpstack
+- Docker 部署示例：https://github.com/chirpstack/chirpstack-docker

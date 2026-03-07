@@ -1,114 +1,138 @@
-# test_pkt_fwd 娴嬭瘯澶囧繕褰?
-**鏃ユ湡锛?* 2026-02-20  
-**娴嬭瘯鐩殑锛?* 楠岃瘉瀹屾暣鐨?Packet Forwarder 娴佹按绾匡紙SX1302 LoRa 鏀跺寘 鈫?ESP32-S3 缁勫抚 鈫?WiFi UDP 涓婃姤 NS锛?
+# test_pkt_fwd 测试备忘录
+
+**日期：** 2026-02-20  
+**测试目的：** 验证完整的 Packet Forwarder 流水线（SX1302 LoRa 收包 → ESP32-S3 组帧 → WiFi UDP 上报 NS）
+
 ---
 
-## 涓€銆佹祴璇曢厤缃?
-### 纭欢
+## 一、测试配置
 
-| 瑙掕壊 | 璁惧 |
+### 硬件
+
+| 角色 | 设备 |
 |------|------|
-| 缃戝叧 | ESP32-S3 + SX1302锛圗SXP1302 鏉匡級 |
-| 鍙戝寘绔?| 鍘熷 LoRa 鍙戝寘浠紙闈?LoRaWAN 鑺傜偣锛?|
+| 网关 | ESP32-S3 + SX1302（ESXP1302 板） |
+| 发包端 | 原始 LoRa 发包仪（非 LoRaWAN 节点） |
 
-### 棰戠巼璁″垝锛圕N490锛?
-| 鍙傛暟 | 鍊?|
+### 频率计划（CN490）
+
+| 参数 | 值 |
 |------|----|
-| Radio 0 涓績棰戠巼 | 480.400 MHz |
-| Radio 1 涓績棰戠巼 | 481.200 MHz |
-| 淇￠亾甯﹀ | 125 kHz |
-| 淇￠亾 0鈥? | Radio 0锛?80.1 / 480.3 / 480.5 / 480.7 MHz |
-| 淇￠亾 4鈥? | Radio 1锛?80.9 / 481.1 / 481.3 / 481.5 MHz |
-| LoRa std 淇￠亾 | Radio 1锛?81.0 MHz锛?50 kHz BW锛孲F7 Explicit |
-| FSK 淇￠亾 | Radio 1锛?81.5 MHz锛?25 kHz BW锛?0 kbps |
+| Radio 0 中心频率 | 480.400 MHz |
+| Radio 1 中心频率 | 481.200 MHz |
+| 信道带宽 | 125 kHz |
+| 信道 0–3 | Radio 0：480.1 / 480.3 / 480.5 / 480.7 MHz |
+| 信道 4–7 | Radio 1：480.9 / 481.1 / 481.3 / 481.5 MHz |
+| LoRa std 信道 | Radio 1，481.0 MHz，250 kHz BW，SF7 Explicit |
+| FSK 信道 | Radio 1，481.5 MHz，125 kHz BW，50 kbps |
 
-### 鍙戝寘绔弬鏁帮紙涓庢湰娆℃祴璇曞搴旓級
+### 发包端参数（与本次测试对应）
 
-| 鍙傛暟 | 鍊?| 璇存槑 |
+| 参数 | 值 | 说明 |
 |------|----|------|
-| 棰戠巼 | 480.500 MHz | 淇￠亾 2锛孯adio 0 +100 kHz |
+| 频率 | 480.500 MHz | 信道 2，Radio 0 +100 kHz |
 | BW | 125 kHz | |
 | SF | 12 | |
 | CR | 4/5 | |
-| SyncWord | 0x34 | LoRaWAN 鍏叡缃戠粶 |
-| CRC | 寮€鍚?| pkt_fwd 榛樿鍙浆鍙?CRC 姝ｇ‘鐨勫寘 |
-| Preamble | 鈮?8 | |
+| SyncWord | 0x34 | LoRaWAN 公共网络 |
+| CRC | 开启 | pkt_fwd 默认只转发 CRC 正确的包 |
+| Preamble | ≥ 8 | |
 | Payload | `hello world` | |
 
-> **娉ㄦ剰 CRC**锛歱kt_fwd 浠庨厤缃枃浠惰鍙?`forward_crc_valid = true`銆乣forward_crc_error = false`銆?> `forward_crc_disabled = false`锛屽洜姝ゅ彂鍖呯**蹇呴』寮€鍚?CRC**锛屽惁鍒欏寘浼氳闈欓粯涓㈠純銆?
+> **注意 CRC**：pkt_fwd 从配置文件读取 `forward_crc_valid = true`、`forward_crc_error = false`、
+> `forward_crc_disabled = false`，因此发包端**必须开启 CRC**，否则包会被静默丢弃。
+
 ---
 
-## 浜屻€乸kt_fwd CLI 鐢ㄦ硶
+## 二、pkt_fwd CLI 用法
 
-缃戝叧鍚姩鍚庤繘鍏?ESP-IDF 鎺у埗鍙帮紝鍛戒护鍚嶄负 `pkt_fwd`銆?**浠讳綍甯﹀弬鏁扮殑璋冪敤鍧囦細灏嗛厤缃啓鍏?NVS锛岀劧鍚庣珛鍗抽噸鍚澶囥€?*
+网关启动后进入 ESP-IDF 控制台，命令名为 `pkt_fwd`。
+**任何带参数的调用均会将配置写入 NVS，然后立即重启设备。**
 
-### 2.1 甯姪
+### 2.1 帮助
 
 ```
 pkt_fwd -h
 ```
 
-### 2.2 閰嶇疆 WiFi 骞惰繛鎺?
+### 2.2 配置 WiFi 并连接
+
 ```
-pkt_fwd -u <SSID> -p <瀵嗙爜>
+pkt_fwd -u <SSID> -p <密码>
 ```
 
-绀轰緥锛?```
+示例：
+```
 pkt_fwd -u MyRouterSSID -p MyPassword123
 ```
 
-鎵ц鍚庤澶囦繚瀛橀厤缃埌 NVS 骞堕噸鍚紝閲嶅惎鍚庤嚜鍔ㄤ互 Station 妯″紡杩炴帴 WiFi銆?
-### 2.3 閰嶇疆 NS锛堢綉缁滄湇鍔″櫒锛夊湴鍧€
+执行后设备保存配置到 NVS 并重启，重启后自动以 Station 模式连接 WiFi。
+
+### 2.3 配置 NS（网络服务器）地址
 
 ```
-pkt_fwd --host <NS_IP鎴栧煙鍚? --port <绔彛鍙?
+pkt_fwd --host <NS_IP或域名> --port <端口号>
 ```
 
-绀轰緥锛?```
+示例：
+```
 pkt_fwd --host 192.168.1.10 --port 1700
 ```
 
-榛樿閰嶇疆鏂囦欢锛坄global_conf.cn490.json`锛変腑 NS 鍦板潃涓?`192.168.1.202:1680`锛岃嫢鏈€氳繃姝ゅ懡浠よ鐩栦笖 NVS 涓棤鍊硷紝鍒欎娇鐢ㄩ厤缃枃浠剁殑缂虹渷鍊笺€?
-### 2.4 閰嶇疆缃戝叧 ID
+默认配置文件（`global_conf.cn490.json`）中 NS 地址为 `192.168.1.202:1680`，若未通过此命令覆盖且 NVS 中无值，则使用配置文件的缺省值。
+
+### 2.4 配置网关 ID
 
 ```
-pkt_fwd --gwid <16浣嶅崄鍏繘鍒跺瓧绗︿覆>
+pkt_fwd --gwid <16位十六进制字符串>
 ```
 
-绀轰緥锛?```
+示例：
+```
 pkt_fwd --gwid AA555A0000001234
 ```
 
-鏈厤缃椂缃戝叧ID浠庨厤缃枃浠惰鍙栵紝榛樿涓?`AA555A00000021FB`銆?
-### 2.5 鍚屾椂閰嶇疆澶氫釜鍙傛暟
+未配置时网关ID从配置文件读取，默认为 `AA555A00000021FB`。
 
-鍚勫弬鏁板彲鍦ㄤ竴鏉″懡浠や腑缁勫悎锛?
+### 2.5 同时配置多个参数
+
+各参数可在一条命令中组合：
+
 ```
 pkt_fwd -u MySSID -p MyPass --host 10.0.0.1 --port 1700 --gwid AA555A0000001234
 ```
 
-### 2.6 Web 閰嶇疆鐣岄潰
+### 2.6 Web 配置界面
 
-杩炴帴鍚屼竴 WiFi 鍚庯紝娴忚鍣ㄨ闂?`http://<璁惧IP>/`锛屽脊鍑?HTTP Basic Auth 璁よ瘉妗嗭細
+连接同一 WiFi 后，浏览器访问 `http://<设备IP>/`，弹出 HTTP Basic Auth 认证框：
 
-- **鐢ㄦ埛鍚?*锛歚iot`
-- **瀵嗙爜**锛歚lora`
+- **用户名**：`iot`
+- **密码**：`lora`
 
-閫氳繃 Web 鐣岄潰鍙互閰嶇疆涓?CLI 鐩稿悓鐨勫弬鏁帮紝淇濆瓨鍚庤澶囪嚜鍔ㄩ噸鍚€?
-> **娉ㄦ剰**锛氳嫢娴忚鍣ㄨ繑鍥?**431 Request Header Fields Too Large**锛?> 闇€鍦?`sdkconfig.defaults` 涓鍔?`CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048`
-> 骞堕噸鏂扮紪璇戠儳褰曘€傝瑙?[BUG-009](../bugfix/BUG-009_http_431_httpd_max_req_hdr_len_too_small.md)銆?
+通过 Web 界面可以配置与 CLI 相同的参数，保存后设备自动重启。
+
+> **注意**：若浏览器返回 **431 Request Header Fields Too Large**，
+> 需在 `sdkconfig.defaults` 中增加 `CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048`
+> 并重新编译烧录。详见 [BUG-009](../bugfix/BUG-009_http_431_httpd_max_req_hdr_len_too_small.md)。
+
 ---
 
-## 涓夈€佹祴璇曟祦绋?
-1. 鐑у綍鍥轰欢锛屼笂鐢?2. 鐢?CLI 閰嶇疆 WiFi锛歚pkt_fwd -u <SSID> -p <Password>`
-3. 绛夊緟璁惧閲嶅惎骞惰繛鎺?WiFi锛岃瀵熶覆鍙ｈ緭鍑? 
+## 三、测试流程
+
+1. 烧录固件，上电
+2. 用 CLI 配置 WiFi：`pkt_fwd -u <SSID> -p <Password>`
+3. 等待设备重启并连接 WiFi，观察串口输出  
    `INFO: [main] concentrator started, packet can now be received`
-4. 鍙戝寘绔互 480.5 MHz SF12 BW125 CRC=ON 鍙戦€佸師濮?LoRa 鍖?5. 涓插彛鐩戣鍖呮帴鏀舵棩蹇?
+4. 发包端以 480.5 MHz SF12 BW125 CRC=ON 发送原始 LoRa 包
+5. 串口监视包接收日志
+
 ---
 
-## 鍥涖€侀獙璇佺粨鏋?
-SX1278 鍘熷 LoRa 鍙戝寘绔彂閫?`"hello world"`锛圫F12, BW125, 480.5 MHz, CRC ON锛夛紝
-缃戝叧鎴愬姛鎺ユ敹骞舵墦鍗?JSON 涓婃姤 UDP锛?
+## 四、验证结果
+
+SX1278 原始 LoRa 发包端发送 `"hello world"`（SF12, BW125, 480.5 MHz, CRC ON），
+网关成功接收并打印 JSON 上报 UDP：
+
 ```
 INFO: Received pkt from mote: 6F6C6C65 (fcnt=28535)
 
@@ -132,25 +156,36 @@ JSON up: {"rxpk":[{
 }]}
 ```
 
-`data` 瀛楁 Base64 瑙ｇ爜 = `hello world`锛屼笌鍙戦€佺涓€鑷淬€?
-### 淇″彿璐ㄩ噺
+`data` 字段 Base64 解码 = `hello world`，与发送端一致。
 
-| 鎸囨爣 | 鍏稿瀷鍊?|
+### 信号质量
+
+| 指标 | 典型值 |
 |------|--------|
 | RSSI | -64 dBm |
 | SNR | +5.0 ~ +5.5 dB |
-| 棰戝亸 foff | ~778 Hz锛堝彂鍖呯涓庣綉鍏虫櫠鎸宸級 |
+| 频偏 foff | ~778 Hz（发包端与网关晶振误差） |
 
 ---
 
-## 浜斻€佸凡鐭ラ潪闃诲鎬у憡璀?
-| 鍛婅淇℃伅 | 鍘熷洜 | 褰卞搷 |
+## 五、已知非阻塞性告警
+
+| 告警信息 | 原因 | 影响 |
 |---------|------|------|
-| `ERROR: failed to read I2C device 0x38` | 鏃?STTS751 娓╁害浼犳劅鍣ㄧ‖浠?| 鏃狅紝娓╁害涓婃姤涓?0 |
-| `MQTT_EVENT_ERROR / MQTT_EVENT_DISCONNECTED` | 鏃?MQTT Broker | 鏃狅紝LoRa 鍖呬粛姝ｅ父閫氳繃 UDP 涓婃姤 |
-| `failed to configure temperature sensor` | 鍚屼笂 | 鏃?|
+| `ERROR: failed to read I2C device 0x38` | 无 STTS751 温度传感器硬件 | 无，温度上报为 0 |
+| `MQTT_EVENT_ERROR / MQTT_EVENT_DISCONNECTED` | 无 MQTT Broker | 无，LoRa 包仍正常通过 UDP 上报 |
+| `failed to configure temperature sensor` | 同上 | 无 |
 
 ---
 
-## 鍏€佽繘搴︾姸鎬?
-- 鉁?CMakeLists.txt INCLUDE_DIRS 淇锛堣 [BUG-006](../bugfix/BUG-006_cmake_include_dirs_multiple_declaration.md)锛?- 鉁?webpage.h 鐢熸垚鏂瑰紡纭锛堣 [BUG-007](../bugfix/BUG-007_webpage_h_not_generated_by_idf_build.md)锛?- 鉁?ESP32-S3 鏃犳晥 GPIO 寮曡剼淇锛堣 [BUG-008](../bugfix/BUG-008_esp32s3_invalid_gpio_pin_defaults.md)锛?- 鉁?HTTP 431 淇锛堣 [BUG-009](../bugfix/BUG-009_http_431_httpd_max_req_hdr_len_too_small.md)锛?- 鉁?WiFi 杩炴帴姝ｅ父锛圫SID: 222锛?- 鉁?SX1302 闆嗕腑鍣ㄥ惎鍔ㄦ垚鍔燂紙`concentrator started`锛?- 鉁?LoRa 鍘熷鍖呮帴鏀堕獙璇侀€氳繃锛圕N490 480.5 MHz SF12 BW125锛?- 鈴?LoRaWAN NS 瀵规帴锛堟棤鍙敤 NS锛屽緟鍚庣画锛?- 鈴?MQTT 瀵规帴锛堟棤 Broker锛屽緟鍚庣画锛?
+## 六、进度状态
+
+- ✅ CMakeLists.txt INCLUDE_DIRS 修复（见 [BUG-006](../bugfix/BUG-006_cmake_include_dirs_multiple_declaration.md)）
+- ✅ webpage.h 生成方式确认（见 [BUG-007](../bugfix/BUG-007_webpage_h_not_generated_by_idf_build.md)）
+- ✅ ESP32-S3 无效 GPIO 引脚修复（见 [BUG-008](../bugfix/BUG-008_esp32s3_invalid_gpio_pin_defaults.md)）
+- ✅ HTTP 431 修复（见 [BUG-009](../bugfix/BUG-009_http_431_httpd_max_req_hdr_len_too_small.md)）
+- ✅ WiFi 连接正常（SSID: 222）
+- ✅ SX1302 集中器启动成功（`concentrator started`）
+- ✅ LoRa 原始包接收验证通过（CN490 480.5 MHz SF12 BW125）
+- ⏳ LoRaWAN NS 对接（无可用 NS，待后续）
+- ⏳ MQTT 对接（无 Broker，待后续）

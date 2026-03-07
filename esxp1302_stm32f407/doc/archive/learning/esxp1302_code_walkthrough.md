@@ -1,98 +1,107 @@
-# ESXP1302 LoRaWAN 缃戝叧浠ｇ爜瀹屾暣瑙ｆ瀽
+# ESXP1302 LoRaWAN 网关代码完整解析
 
-> 鏃ユ湡锛?026-02-22  
-> 椤圭洰锛歟sxp1302_on_esp32s3  
-> 骞冲彴锛欵SP32-S3 + SX1302/SX1303 LoRa 闆嗕腑鍣? 
-> 妗嗘灦锛欵SP-IDF v5.4.3 + FreeRTOS  
-> HAL锛歋emtech sx1302_hal v2.1.0  
-> 鍗忚锛歋emtech Packet Forwarder Protocol v2 (UDP)
-
----
-
-## 鐩綍
-
-- [绗竴閮ㄥ垎锛歛pp\_main() 鍏ュ彛鍙婂惎鍔ㄦ祦绋媇(#绗竴閮ㄥ垎app_main-鍏ュ彛鍙婂惎鍔ㄦ祦绋?
-  - [1.1 OLED 鍒濆鍖栦笌鎸夐挳妫€娴媇(#11-oled-鍒濆鍖栦笌鎸夐挳妫€娴?
-  - [1.2 NVS 閰嶇疆绯荤粺锛堟繁鍏ワ級](#12-nvs-閰嶇疆绯荤粺娣卞叆)
-  - [1.3 WiFi 妯″紡鍐崇瓥閫昏緫](#13-wifi-妯″紡鍐崇瓥閫昏緫)
-  - [1.4 涓插彛鎺у埗鍙?REPL锛堟繁鍏ワ級](#14-涓插彛鎺у埗鍙?repl娣卞叆)
-- [绗簩閮ㄥ垎锛歐iFi 杩炴帴涓庝簨浠堕┍鍔ㄦ灦鏋刔(#绗簩閮ㄥ垎wifi-杩炴帴涓庝簨浠堕┍鍔ㄦ灦鏋?
-  - [2.1 wifi\_init\_sta() 璇﹁В](#21-wifi_init_sta-璇﹁В)
-  - [2.2 ESP 浜嬩欢寰幆鏈哄埗锛堟繁鍏ワ級](#22-esp-浜嬩欢寰幆鏈哄埗娣卞叆)
-  - [2.3 wifi\_sta\_event\_handler 涓変釜鐘舵€乚(#23-wifi_sta_event_handler-涓変釜鐘舵€?
-- [绗笁閮ㄥ垎锛歱kt\_fwd\_main() 鏍稿績鍒濆鍖朷(#绗笁閮ㄥ垎pkt_fwd_main-鏍稿績鍒濆鍖?
-  - [3.1 浜掓枼閲忓垱寤篯(#31-浜掓枼閲忓垱寤?
-  - [3.2 JSON 閰嶇疆鍔犺浇涓庨鐜囪ˉ涓乚(#32-json-閰嶇疆鍔犺浇涓庨鐜囪ˉ涓?
-  - [3.3 涓変釜 parse\_\* 鍑芥暟](#33-涓変釜-parse_-鍑芥暟)
-  - [3.4 UDP Socket 鍒涘缓涓庤繛鎺(#34-udp-socket-鍒涘缓涓庤繛鎺?
-  - [3.5 SX1302 澶嶄綅涓庡惎鍔╙(#35-sx1302-澶嶄綅涓庡惎鍔?
-  - [3.6 宸ヤ綔绾跨▼鍒涘缓](#36-宸ヤ綔绾跨▼鍒涘缓)
-  - [3.7 涓诲惊鐜細缁熻鏀堕泦](#37-涓诲惊鐜粺璁℃敹闆?
-- [绗洓閮ㄥ垎锛氫笁澶ф牳蹇冪嚎绋嬭瑙(#绗洓閮ㄥ垎涓夊ぇ鏍稿績绾跨▼璇﹁В)
-  - [4.1 thread\_up 鈥?涓婅绾跨▼](#41-thread_up--涓婅绾跨▼)
-  - [4.2 thread\_down 鈥?涓嬭绾跨▼](#42-thread_down--涓嬭绾跨▼)
-  - [4.3 thread\_jit 鈥?JIT 瀹氭椂鍙戝皠绾跨▼](#43-thread_jit--jit-瀹氭椂鍙戝皠绾跨▼)
-  - [4.4 涓夌嚎绋嬪崗浣滃畬鏁存暟鎹祦](#44-涓夌嚎绋嬪崗浣滃畬鏁存暟鎹祦)
-- [闄勫綍A锛氭俯搴︿紶鎰熷櫒闂璇﹁В锛堣俯鍧戣褰曪級](#闄勫綍a娓╁害浼犳劅鍣ㄩ棶棰樿瑙ｈ俯鍧戣褰?
-- [闄勫綍B锛氫簰鏂ラ噺浣跨敤姹囨€籡(#闄勫綍b浜掓枼閲忎娇鐢ㄦ眹鎬?
-- [闄勫綍C锛氬叧閿父閲忛€熸煡琛╙(#闄勫綍c鍏抽敭甯搁噺閫熸煡琛?
-- [闄勫綍D锛氱‖浠跺紩鑴氭槧灏刔(#闄勫綍d纭欢寮曡剼鏄犲皠)
+> 日期：2026-02-22  
+> 项目：esxp1302_on_esp32s3  
+> 平台：ESP32-S3 + SX1302/SX1303 LoRa 集中器  
+> 框架：ESP-IDF v5.4.3 + FreeRTOS  
+> HAL：Semtech sx1302_hal v2.1.0  
+> 协议：Semtech Packet Forwarder Protocol v2 (UDP)
 
 ---
 
-## 绗竴閮ㄥ垎锛歛pp_main() 鍏ュ彛鍙婂惎鍔ㄦ祦绋?
-**鏂囦欢**: `main/packet_forwarder/lora_pkt_fwd.c` 绾︾4336琛?
-### 1.1 OLED 鍒濆鍖栦笌鎸夐挳妫€娴?
-`app_main()` 鏄?ESP-IDF 鐨勫敮涓€鍏ュ彛鍑芥暟锛岀瓑鍚屼簬 Linux 鐨?`main()`銆傚惎鍔ㄩ『搴忓涓嬶細
+## 目录
+
+- [第一部分：app\_main() 入口及启动流程](#第一部分app_main-入口及启动流程)
+  - [1.1 OLED 初始化与按钮检测](#11-oled-初始化与按钮检测)
+  - [1.2 NVS 配置系统（深入）](#12-nvs-配置系统深入)
+  - [1.3 WiFi 模式决策逻辑](#13-wifi-模式决策逻辑)
+  - [1.4 串口控制台 REPL（深入）](#14-串口控制台-repl深入)
+- [第二部分：WiFi 连接与事件驱动架构](#第二部分wifi-连接与事件驱动架构)
+  - [2.1 wifi\_init\_sta() 详解](#21-wifi_init_sta-详解)
+  - [2.2 ESP 事件循环机制（深入）](#22-esp-事件循环机制深入)
+  - [2.3 wifi\_sta\_event\_handler 三个状态](#23-wifi_sta_event_handler-三个状态)
+- [第三部分：pkt\_fwd\_main() 核心初始化](#第三部分pkt_fwd_main-核心初始化)
+  - [3.1 互斥量创建](#31-互斥量创建)
+  - [3.2 JSON 配置加载与频率补丁](#32-json-配置加载与频率补丁)
+  - [3.3 三个 parse\_\* 函数](#33-三个-parse_-函数)
+  - [3.4 UDP Socket 创建与连接](#34-udp-socket-创建与连接)
+  - [3.5 SX1302 复位与启动](#35-sx1302-复位与启动)
+  - [3.6 工作线程创建](#36-工作线程创建)
+  - [3.7 主循环：统计收集](#37-主循环统计收集)
+- [第四部分：三大核心线程详解](#第四部分三大核心线程详解)
+  - [4.1 thread\_up — 上行线程](#41-thread_up--上行线程)
+  - [4.2 thread\_down — 下行线程](#42-thread_down--下行线程)
+  - [4.3 thread\_jit — JIT 定时发射线程](#43-thread_jit--jit-定时发射线程)
+  - [4.4 三线程协作完整数据流](#44-三线程协作完整数据流)
+- [附录A：温度传感器问题详解（踩坑记录）](#附录a温度传感器问题详解踩坑记录)
+- [附录B：互斥量使用汇总](#附录b互斥量使用汇总)
+- [附录C：关键常量速查表](#附录c关键常量速查表)
+- [附录D：硬件引脚映射](#附录d硬件引脚映射)
+
+---
+
+## 第一部分：app_main() 入口及启动流程
+
+**文件**: `main/packet_forwarder/lora_pkt_fwd.c` 约第4336行
+
+### 1.1 OLED 初始化与按钮检测
+
+`app_main()` 是 ESP-IDF 的唯一入口函数，等同于 Linux 的 `main()`。启动顺序如下：
 
 ```c
 void app_main(void)
 {
-    // 鈶?鎵撳嵃鐗堟湰鍙?    printf("\n\n*** ESXP1302 Gateway. Version: %s ***\n\n\n", EXSP1302_VERSION);
+    // ① 打印版本号
+    printf("\n\n*** ESXP1302 Gateway. Version: %s ***\n\n\n", EXSP1302_VERSION);
 
-    // 鈶?OLED 鍒濆鍖栧苟鏄剧ず鍚姩鐢婚潰
+    // ② OLED 初始化并显示启动画面
     oled_init();
     oled_cls();
     oled_show_str(0, 0, "ESXP1302 GATEWAY", 2);
 
-    // 鈶?閰嶇疆涓や釜鐢ㄦ埛鎸夐挳鐨?GPIO锛圛O0 鍜?IO6锛?    // 鎸夐挳鏄綆鐢靛钩鏈夋晥锛圔UTTON_PRESSED=0锛夛紝鎵€浠ュ紑鍚笂鎷?    if(USER_BUTTON_1 != GPIO_NUM_NC){
+    // ③ 配置两个用户按钮的 GPIO（IO0 和 IO6）
+    // 按钮是低电平有效（BUTTON_PRESSED=0），所以开启上拉
+    if(USER_BUTTON_1 != GPIO_NUM_NC){
         gpio_set_direction(USER_BUTTON_1, GPIO_MODE_INPUT);
         gpio_pullup_en(USER_BUTTON_1);
     }
-    // USER_BUTTON_2 鍚岀悊
+    // USER_BUTTON_2 同理
 
-    // 鈶?浠?NVS 璇诲彇閰嶇疆锛堣 1.2 鑺傝瑙ｏ級
+    // ④ 从 NVS 读取配置（见 1.2 节详解）
     read_config_from_nvs();
 
-    // 鈶?鍒ゆ柇 WiFi 妯″紡锛堣 1.3 鑺傦級
-    // 鈶?鍚姩 HTTP 鏈嶅姟鍜?REPL 鎺у埗鍙帮紙瑙?1.4 鑺傦級
+    // ⑤ 判断 WiFi 模式（见 1.3 节）
+    // ⑥ 启动 HTTP 服务和 REPL 控制台（见 1.4 节）
 }
 ```
 
-### 1.2 NVS 閰嶇疆绯荤粺锛堟繁鍏ワ級
+### 1.2 NVS 配置系统（深入）
 
-**鏂囦欢**: `main/packet_forwarder/web_config.c` + `web_config.h`
+**文件**: `main/packet_forwarder/web_config.c` + `web_config.h`
 
-NVS锛圢on-Volatile Storage锛夋槸 ESP-IDF 鎻愪緵鐨勯敭鍊煎瀛樺偍绯荤粺锛屾暟鎹繚瀛樺湪 Flash 鐨勪笓鐢ㄥ垎鍖轰腑锛屾帀鐢典笉涓㈠け銆?
-#### 鏁版嵁缁撴瀯
+NVS（Non-Volatile Storage）是 ESP-IDF 提供的键值对存储系统，数据保存在 Flash 的专用分区中，掉电不丢失。
+
+#### 数据结构
 
 ```c
 // web_config.h
 typedef enum {
     WIFI_SSID = 0, WIFI_PASSWORD, NS_HOST, NS_PORT, GW_ID,
     WIFI_MODE, FREQ_REGION, FREQ_RADIO0, FREQ_RADIO1, NTP_SERVER,
-    CONFIG_NUM,      // = 10锛屾€诲叡10涓厤缃」
+    CONFIG_NUM,      // = 10，总共10个配置项
     CONFIG_ERR = 255
 } tag_e;
 
 typedef struct {
-    tag_e tag;       // 鏋氫妇绱㈠紩
-    char name[16];   // NVS 涓殑閿悕
-    char *val;       // 鍊硷紙鍔ㄦ€佸垎閰嶇殑瀛楃涓诧級
-    int len;         // 瀛楃涓查暱搴?} config_s;
+    tag_e tag;       // 枚举索引
+    char name[16];   // NVS 中的键名
+    char *val;       // 值（动态分配的字符串）
+    int len;         // 字符串长度
+} config_s;
 ```
 
-閰嶇疆琛ㄥ垵濮嬪寲锛?
+配置表初始化：
+
 ```c
 config_s config[CONFIG_NUM] = {
     { WIFI_SSID,     "wifi_ssid",   NULL, 0 },
@@ -108,12 +117,13 @@ config_s config[CONFIG_NUM] = {
 };
 ```
 
-#### 鍒濆鍖栨祦绋?
+#### 初始化流程
+
 ```c
 esp_err_t init_config_storage(void)
 {
     esp_err_t err = nvs_flash_init();
-    // 濡傛灉 NVS 鍒嗗尯鎹熷潖锛堢増鏈笉鍖归厤鎴栨弧浜嗭級锛屽厛鎿﹂櫎鍐嶅垵濮嬪寲
+    // 如果 NVS 分区损坏（版本不匹配或满了），先擦除再初始化
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
         err = nvs_flash_init();
@@ -124,32 +134,33 @@ esp_err_t init_config_storage(void)
 }
 ```
 
-#### 璇诲彇娴佺▼锛堜袱姝ヨ皟鐢ㄦā寮忥級
+#### 读取流程（两步调用模式）
 
 ```c
 esp_err_t read_config(void)
 {
     nvs_handle_t my_handle;
-    nvs_open("nvs", NVS_READONLY, &my_handle);  // 鎵撳紑 namespace "nvs"
+    nvs_open("nvs", NVS_READONLY, &my_handle);  // 打开 namespace "nvs"
 
     for(int i = 0; i < CONFIG_NUM; i++){
-        // 绗竴姝ワ細浼?NULL 鑾峰彇鍊肩殑闀垮害
+        // 第一步：传 NULL 获取值的长度
         err = nvs_get_str(my_handle, config[i].name, NULL, &len);
 
-        // 绗簩姝ワ細鏍规嵁闀垮害 malloc锛屽啀浼犲叆鐪熸鐨勭紦鍐插尯
+        // 第二步：根据长度 malloc，再传入真正的缓冲区
         p = malloc(len);
         err = nvs_get_str(my_handle, config[i].name, p, &len);
 
         config[i].val = p;
-        config[i].len = len - 1;  // 涓嶇畻 \0
+        config[i].len = len - 1;  // 不算 \0
     }
     nvs_close(my_handle);
 }
 ```
 
-**涓轰粈涔堥渶瑕佷袱姝ヨ皟鐢紵**  
-鍥犱负 NVS 涓瓨鍌ㄧ殑瀛楃涓查暱搴︿笉鍥哄畾锛屽繀椤诲厛鏌ヨ闀垮害鍐嶅垎閰嶅唴瀛橈紝閬垮厤娴垂鎴栨孩鍑恒€傝繖鏄?ESP-IDF NVS API 鐨勬爣鍑嗙敤娉曘€?
-#### 鍐欏叆娴佺▼
+**为什么需要两步调用？**  
+因为 NVS 中存储的字符串长度不固定，必须先查询长度再分配内存，避免浪费或溢出。这是 ESP-IDF NVS API 的标准用法。
+
+#### 写入流程
 
 ```c
 int save_config(void)
@@ -161,90 +172,105 @@ int save_config(void)
         if(config[i].val != NULL)
             nvs_set_str(my_handle, config[i].name, config[i].val);
     }
-    nvs_commit(my_handle);  // 鍏抽敭锛佷笉 commit 鏁版嵁涓嶄細鍐欏叆 Flash
+    nvs_commit(my_handle);  // 关键！不 commit 数据不会写入 Flash
     nvs_close(my_handle);
 }
 ```
 
-**`nvs_commit()` 鐨勫繀瑕佹€э細** `nvs_set_str()` 鍙槸鎶婃暟鎹啓鍏?RAM 缂撳啿鍖猴紝蹇呴』璋冪敤 `nvs_commit()` 鎵嶈兘鐪熸鎸佷箙鍖栧埌 Flash銆?
-#### 閰嶇疆鏉ユ簮浼樺厛绾?
-NVS 涓殑鍊间細瑕嗙洊 JSON 涓殑榛樿鍊硷紙鍦?`pkt_fwd_main()` 涓疄鐜帮級锛?
+**`nvs_commit()` 的必要性：** `nvs_set_str()` 只是把数据写入 RAM 缓冲区，必须调用 `nvs_commit()` 才能真正持久化到 Flash。
+
+#### 配置来源优先级
+
+NVS 中的值会覆盖 JSON 中的默认值（在 `pkt_fwd_main()` 中实现）：
+
 ```
-JSON 榛樿鍊?(global_cn_conf) 鈫?NVS 瑕嗙洊 (濡傛灉鏈夊€?
-                                鈫?                        Web 椤甸潰 / CLI 淇敼 鈫?save_config() 鈫?NVS
+JSON 默认值 (global_cn_conf) → NVS 覆盖 (如果有值)
+                                ↑
+                        Web 页面 / CLI 修改 → save_config() → NVS
 ```
 
-### 1.3 WiFi 妯″紡鍐崇瓥閫昏緫
+### 1.3 WiFi 模式决策逻辑
 
-WiFi 妯″紡鍒ゆ柇鐨勪紭鍏堢骇閾撅細
+WiFi 模式判断的优先级链：
 
 ```c
-if (USER_BUTTON_1 鎸変笅)         鈫?Soft-AP 妯″紡锛堝己鍒讹級
-else if (USER_BUTTON_2 鎸変笅)     鈫?Station 妯″紡锛堝己鍒讹級
-else if (NVS 涓?wifi_mode 鏈缃? 鈫?Soft-AP 妯″紡锛堥娆″惎鍔ㄩ粯璁わ級
-else if (NVS 涓?wifi_mode == "soft_ap") 鈫?Soft-AP 妯″紡
-else                              鈫?Station 妯″紡
+if (USER_BUTTON_1 按下)         → Soft-AP 模式（强制）
+else if (USER_BUTTON_2 按下)     → Station 模式（强制）
+else if (NVS 中 wifi_mode 未设置) → Soft-AP 模式（首次启动默认）
+else if (NVS 中 wifi_mode == "soft_ap") → Soft-AP 模式
+else                              → Station 模式
 ```
 
-**鍏抽敭璁捐锛氬紑鏈哄墠鎸変綇 IO0 鎸夐挳鍙互寮哄埗杩涘叆 Soft-AP 閰嶇疆妯″紡**锛岃繖鏄?鏁戠爾"鎵嬫鈥斺€斿嵆浣?WiFi 瀵嗙爜閰嶉敊浜嗭紝涔熻兘閫氳繃鎸夐挳杩涘叆 AP 妯″紡閲嶆柊閰嶇疆銆?
-#### Soft-AP 妯″紡鍚姩
+**关键设计：开机前按住 IO0 按钮可以强制进入 Soft-AP 配置模式**，这是"救砖"手段——即使 WiFi 密码配错了，也能通过按钮进入 AP 模式重新配置。
+
+#### Soft-AP 模式启动
 
 ```c
 if(soft_ap_mode == true){
-    // 鍏堟妸 wifi_mode 鏀逛负 station 骞朵繚瀛樺埌 NVS
-    // 杩欐牱涓嬫閲嶅惎灏变笉浼氬啀杩?AP 妯″紡
+    // 先把 wifi_mode 改为 station 并保存到 NVS
+    // 这样下次重启就不会再进 AP 模式
     config_wifi_mode(WIFI_MODE_STATION);
 
-    // 璁剧疆 10 鍒嗛挓鍚庤嚜鍔ㄩ噸鍚紙闃叉鐢ㄦ埛蹇樹簡閰嶇疆灏辩寮€锛?    reboot_delay_s = 60 * 10;
+    // 设置 10 分钟后自动重启（防止用户忘了配置就离开）
+    reboot_delay_s = 60 * 10;
     reboot_flag = true;
     start_reboot_timer_ms(reboot_delay_s * 1000);
 
     wifi_init_soft_ap();
-    // OLED 鏄剧ず: IP=192.168.4.1, Soft AP mode, SSID=esp32, PSWD=esp32wifi
+    // OLED 显示: IP=192.168.4.1, Soft AP mode, SSID=esp32, PSWD=esp32wifi
 }
 ```
 
-#### Station 妯″紡鍚姩
+#### Station 模式启动
 
 ```c
 else {
-    // 鍏堟妸 wifi_mode 鏀逛负 soft_ap 骞朵繚瀛?    // 杩欐牱濡傛灉杩炰笉涓?WiFi锛屼笅娆￠噸鍚氨浼氳繘 AP 妯″紡
+    // 先把 wifi_mode 改为 soft_ap 并保存
+    // 这样如果连不上 WiFi，下次重启就会进 AP 模式
     config_wifi_mode(WIFI_MODE_SOFT_AP);
 
-    // 璁剧疆 5 鍒嗛挓鍚庤嚜鍔ㄩ噸鍚?    reboot_delay_s = 60 * 5;
+    // 设置 5 分钟后自动重启
+    reboot_delay_s = 60 * 5;
     reboot_flag = true;
     start_reboot_timer_ms(reboot_delay_s * 1000);
 
-    wifi_init_sta();  // 鈫?璇﹁绗簩閮ㄥ垎
+    wifi_init_sta();  // → 详见第二部分
 }
 ```
 
-**妯″紡鍒囨崲鐨勮嚜淇濇姢鏈哄埗锛?*
+**模式切换的自保护机制：**
 
-| 鍔ㄤ綔 | NVS wifi_mode 鍐欏叆鍊?| 涓轰粈涔?|
+| 动作 | NVS wifi_mode 写入值 | 为什么 |
 |------|------|------|
-| 杩涘叆 Soft-AP | `"station"` | 涓嬫閲嶅惎鑷姩鍥?Station锛堜笉鍗″湪閰嶇疆妯″紡锛?|
-| 杩涘叆 Station | `"soft_ap"` | 濡傛灉 WiFi 杩炰笉涓婏紝涓嬫閲嶅惎鑷姩杩?Soft-AP锛堝彲閲嶆柊閰嶇疆锛?|
-| Station 杩炴帴鎴愬姛 | `"station"` | WiFi 纭鍙敤锛屼繚鎸?Station 妯″紡 |
+| 进入 Soft-AP | `"station"` | 下次重启自动回 Station（不卡在配置模式） |
+| 进入 Station | `"soft_ap"` | 如果 WiFi 连不上，下次重启自动进 Soft-AP（可重新配置） |
+| Station 连接成功 | `"station"` | WiFi 确认可用，保持 Station 模式 |
 
-### 1.4 涓插彛鎺у埗鍙?REPL锛堟繁鍏ワ級
+### 1.4 串口控制台 REPL（深入）
 
-REPL锛圧ead-Eval-Print Loop锛夋槸閫氳繃涓插彛锛圲SB-UART锛夊疄鐜扮殑鍛戒护琛屼氦浜掔晫闈€?
-#### 鍒濆鍖?
+REPL（Read-Eval-Print Loop）是通过串口（USB-UART）实现的命令行交互界面。
+
+#### 初始化
+
 ```c
-// 閰嶇疆 REPL
+// 配置 REPL
 esp_console_repl_config_t repl_config = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
-repl_config.task_stack_size = 4096 * 2;  // 8KB 鏍?repl_config.prompt = "ESXP1302_GW>";     // 鍛戒护鎻愮ず绗?
-// 娉ㄥ唽鑷畾涔夊懡浠?usage();           // 鎵撳嵃甯姪淇℃伅
-register_config(); // 娉ㄥ唽 "pkt_fwd" 鍛戒护
+repl_config.task_stack_size = 4096 * 2;  // 8KB 栈
+repl_config.prompt = "ESXP1302_GW>";     // 命令提示符
 
-// 鍒涘缓 UART REPL 骞跺惎鍔?esp_console_repl_t *repl = NULL;
+// 注册自定义命令
+usage();           // 打印帮助信息
+register_config(); // 注册 "pkt_fwd" 命令
+
+// 创建 UART REPL 并启动
+esp_console_repl_t *repl = NULL;
 esp_console_dev_uart_config_t uart_config = ESP_CONSOLE_DEV_UART_CONFIG_DEFAULT();
 ESP_ERROR_CHECK(esp_console_new_repl_uart(&uart_config, &repl_config, &repl));
 ESP_ERROR_CHECK(esp_console_start_repl(repl));
 ```
 
-#### 鍛戒护娉ㄥ唽锛坅rgtable3锛?
+#### 命令注册（argtable3）
+
 ```c
 static struct {
     struct arg_str *wifi_ssid;   // --ssid "304"
@@ -257,7 +283,7 @@ static struct {
 
 void register_config(void)
 {
-    // 瀹氫箟姣忎釜鍙傛暟
+    // 定义每个参数
     net_conf_args.wifi_ssid  = arg_str0(NULL, "ssid", "<SSID>", "SSID of AP");
     net_conf_args.wifi_pswd  = arg_str0(NULL, "pswd", "<Password>", "Password of AP");
     net_conf_args.udp_host   = arg_str0(NULL, "host", "<UDP Host>", "UDP Host");
@@ -265,153 +291,180 @@ void register_config(void)
     net_conf_args.gw_id      = arg_str0(NULL, "gwid", "<gateway id>", "Gateway Id");
     net_conf_args.end = arg_end(2);
 
-    // 娉ㄥ唽鍒?esp_console
+    // 注册到 esp_console
     const esp_console_cmd_t hal_conf_cmd = {
         .command = "pkt_fwd",
         .help = "ESP32 packet forwarder based on sx1302_hal",
-        .func = &do_net_config_cmd,     // 鍥炶皟鍑芥暟
+        .func = &do_net_config_cmd,     // 回调函数
         .argtable = &net_conf_args
     };
     ESP_ERROR_CHECK(esp_console_cmd_register(&hal_conf_cmd));
 }
 ```
 
-**鐢ㄦ硶绀轰緥锛?*
+**用法示例：**
 ```
 ESXP1302_GW> pkt_fwd --ssid "MyWiFi" --pswd "12345678" --host "192.168.1.100" --port 1700
 ```
 
-#### 鍛戒护澶勭悊鍑芥暟
+#### 命令处理函数
 
 ```c
 static int do_net_config_cmd(int argc, char **argv)
 {
-    // argtable3 瑙ｆ瀽鍙傛暟
+    // argtable3 解析参数
     int nerrors = arg_parse(argc, argv, (void **)&net_conf_args);
     if (nerrors != 0) {
         arg_print_errors(stderr, net_conf_args.end, argv[0]);
         return 1;
     }
 
-    // 閫愪釜妫€鏌ュ苟鏇存柊 config[]
+    // 逐个检查并更新 config[]
     if (net_conf_args.wifi_ssid->count > 0) {
-        // 鏇存柊 config[WIFI_SSID]
+        // 更新 config[WIFI_SSID]
     }
-    // ... 鍏朵粬鍙傛暟鍚岀悊
+    // ... 其他参数同理
 
-    save_config();  // 淇濆瓨鍒?NVS
+    save_config();  // 保存到 NVS
 
-    // 鍙栨秷閲嶅惎瀹氭椂鍣紙璇存槑鐢ㄦ埛閫氳繃 CLI 鍦ㄧ嚎淇敼浜嗛厤缃級
+    // 取消重启定时器（说明用户通过 CLI 在线修改了配置）
     reboot_flag = false;
-    // 鏍囪闇€瑕侀噸鍚互搴旂敤鏂伴厤缃?    printf("Config saved. Please reboot to apply.\n");
+    // 标记需要重启以应用新配置
+    printf("Config saved. Please reboot to apply.\n");
     return 0;
 }
 ```
 
-**`reboot_flag = false` 鐨勬剰涔夛細** 鍦?Station 妯″紡涓嬶紝绯荤粺榛樿璁句簡 5 鍒嗛挓閲嶅惎瀹氭椂鍣紙鎬曡繛涓嶄笂 WiFi 鍗℃锛夈€傚鏋滅敤鎴烽€氳繃 CLI 鎴愬姛淇敼浜嗛厤缃紙姣斿鏀逛簡 WiFi 瀵嗙爜锛夛紝璇存槑涓插彛鏄€氱殑锛岀敤鎴锋湁鎺у埗鏉冿紝灏卞彇娑堣嚜鍔ㄩ噸鍚€?
+**`reboot_flag = false` 的意义：** 在 Station 模式下，系统默认设了 5 分钟重启定时器（怕连不上 WiFi 卡死）。如果用户通过 CLI 成功修改了配置（比如改了 WiFi 密码），说明串口是通的，用户有控制权，就取消自动重启。
+
 ---
 
-## 绗簩閮ㄥ垎锛歐iFi 杩炴帴涓庝簨浠堕┍鍔ㄦ灦鏋?
-### 2.1 wifi_init_sta() 璇﹁В
+## 第二部分：WiFi 连接与事件驱动架构
+
+### 2.1 wifi_init_sta() 详解
 
 ```c
 void wifi_init_sta(void)
 {
-    // 鈶?鍒涘缓 FreeRTOS 浜嬩欢缁勶紙鐢ㄤ簬鍚屾绛夊緟锛?    s_wifi_event_group = xEventGroupCreate();
+    // ① 创建 FreeRTOS 事件组（用于同步等待）
+    s_wifi_event_group = xEventGroupCreate();
 
-    // 鈶?鍒濆鍖?TCP/IP 鍗忚鏍?    ESP_ERROR_CHECK(esp_netif_init());
+    // ② 初始化 TCP/IP 协议栈
+    ESP_ERROR_CHECK(esp_netif_init());
 
-    // 鈶?鍒涘缓榛樿浜嬩欢寰幆锛堝叏灞€鍗曚緥锛?    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    // ③ 创建默认事件循环（全局单例）
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    // 鈶?鍒涘缓榛樿鐨?STA 缃戠粶鎺ュ彛
+    // ④ 创建默认的 STA 网络接口
     esp_netif_create_default_wifi_sta();
 
-    // 鈶?WiFi 鍒濆鍖?    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    // ⑤ WiFi 初始化
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    // 鈶?娉ㄥ唽浜嬩欢澶勭悊鍑芥暟
+    // ⑥ 注册事件处理函数
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
-        WIFI_EVENT,            // 浜嬩欢鍩?        ESP_EVENT_ANY_ID,      // 璁㈤槄鎵€鏈?WiFi 浜嬩欢
+        WIFI_EVENT,            // 事件基
+        ESP_EVENT_ANY_ID,      // 订阅所有 WiFi 事件
         &wifi_sta_event_handler,
         NULL,
         &instance_any_id));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
-        IP_EVENT,              // IP 浜嬩欢鍩?        IP_EVENT_STA_GOT_IP,   // 鍙闃?鑾峰彇鍒癐P"浜嬩欢
+        IP_EVENT,              // IP 事件基
+        IP_EVENT_STA_GOT_IP,   // 只订阅"获取到IP"事件
         &wifi_sta_event_handler,
         NULL,
         &instance_got_ip));
 
-    // 鈶?閰嶇疆骞跺惎鍔?WiFi
+    // ⑦ 配置并启动 WiFi
     wifi_config_t wifi_config = {
         .sta = {
-            .ssid = ...,       // 浠?config[WIFI_SSID] 鏉?            .password = ...,   // 浠?config[WIFI_PASSWORD] 鏉?            .threshold.authmode = WIFI_AUTH_WPA2_PSK,
+            .ssid = ...,       // 从 config[WIFI_SSID] 来
+            .password = ...,   // 从 config[WIFI_PASSWORD] 来
+            .threshold.authmode = WIFI_AUTH_WPA2_PSK,
         },
     };
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());  // 瑙﹀彂 WIFI_EVENT_STA_START
+    ESP_ERROR_CHECK(esp_wifi_start());  // 触发 WIFI_EVENT_STA_START
 }
 ```
 
-**娉ㄦ剰锛歚esp_wifi_start()` 鏄潪闃诲鐨勩€?* 瀹冨彧鏄憡璇?WiFi 椹卞姩"寮€濮嬪惂"锛岀劧鍚庣珛鍗宠繑鍥炪€傜湡姝ｇ殑杩炴帴杩囩▼鏄紓姝ョ殑锛岄€氳繃浜嬩欢鍥炶皟閫氱煡缁撴灉銆?
-### 2.2 ESP 浜嬩欢寰幆鏈哄埗锛堟繁鍏ワ級
+**注意：`esp_wifi_start()` 是非阻塞的。** 它只是告诉 WiFi 驱动"开始吧"，然后立即返回。真正的连接过程是异步的，通过事件回调通知结果。
 
-ESP-IDF 鐨勪簨浠跺惊鐜槸涓€涓?*鍙戝竷-璁㈤槄**妯″紡鐨勬秷鎭郴缁燂細
+### 2.2 ESP 事件循环机制（深入）
+
+ESP-IDF 的事件循环是一个**发布-订阅**模式的消息系统：
 
 ```
-                    鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                    鈹?     榛樿浜嬩欢寰幆            鈹?                    鈹?  (杩愯鍦ㄧ嫭绔嬬殑绯荤粺浠诲姟涓?    鈹?                    鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                               鈹?            鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹尖攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?            鈹?                 鈹?                 鈹?     WIFI_EVENT           IP_EVENT          鑷畾涔変簨浠?     鈹溾攢 STA_START         鈹溾攢 GOT_IP          ...
-     鈹溾攢 STA_DISCONNECTED  鈹溾攢 LOST_IP
-     鈹溾攢 STA_CONNECTED     鈹斺攢 ...
-     鈹斺攢 ...
+                    ┌─────────────────────────────┐
+                    │      默认事件循环            │
+                    │   (运行在独立的系统任务中)    │
+                    └──────────┬──────────────────┘
+                               │
+            ┌──────────────────┼──────────────────┐
+            │                  │                  │
+     WIFI_EVENT           IP_EVENT          自定义事件
+     ├─ STA_START         ├─ GOT_IP          ...
+     ├─ STA_DISCONNECTED  ├─ LOST_IP
+     ├─ STA_CONNECTED     └─ ...
+     └─ ...
 ```
 
-**鏍稿績姒傚康锛?*
-- `event_base`锛堜簨浠跺熀锛夛細鍒嗙被锛屽 `WIFI_EVENT`銆乣IP_EVENT`
-- `event_id`锛氬叿浣撲簨浠讹紝濡?`WIFI_EVENT_STA_START`
-- `event_data`锛氫簨浠舵惡甯︾殑鏁版嵁锛堝 `ip_event_got_ip_t` 鍖呭惈 IP 鍦板潃锛?- 澶勭悊鍑芥暟杩愯鍦?*浜嬩欢寰幆浠诲姟**鐨勪笂涓嬫枃涓紝涓嶆槸涓柇涓婁笅鏂?
-**璁㈤槄 vs 鍙戝竷锛?*
+**核心概念：**
+- `event_base`（事件基）：分类，如 `WIFI_EVENT`、`IP_EVENT`
+- `event_id`：具体事件，如 `WIFI_EVENT_STA_START`
+- `event_data`：事件携带的数据（如 `ip_event_got_ip_t` 包含 IP 地址）
+- 处理函数运行在**事件循环任务**的上下文中，不是中断上下文
+
+**订阅 vs 发布：**
 ```c
-// 璁㈤槄锛堝簲鐢ㄥ眰鍋氱殑锛?esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &handler, ...);
+// 订阅（应用层做的）
+esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &handler, ...);
 
-// 鍙戝竷锛圵iFi 椹卞姩鍐呴儴鍋氱殑锛?esp_event_post(WIFI_EVENT, WIFI_EVENT_STA_START, NULL, 0, 0);
+// 发布（WiFi 驱动内部做的）
+esp_event_post(WIFI_EVENT, WIFI_EVENT_STA_START, NULL, 0, 0);
 ```
 
-### 2.3 wifi_sta_event_handler 涓変釜鐘舵€?
+### 2.3 wifi_sta_event_handler 三个状态
+
 ```c
 static void wifi_sta_event_handler(void* arg, esp_event_base_t event_base,
                                    int32_t event_id, void* event_data)
 ```
 
-#### 鐘舵€?锛歋TA_START 鈫?鍙戣捣杩炴帴
+#### 状态1：STA_START → 发起连接
 
 ```
-esp_wifi_start() 鈹€鈫?[WIFI_EVENT_STA_START] 鈹€鈫?esp_wifi_connect()
+esp_wifi_start() ─→ [WIFI_EVENT_STA_START] ─→ esp_wifi_connect()
 ```
 
-WiFi 椹卞姩鍒濆鍖栧畬鎴愬悗鑷姩瑙﹀彂姝や簨浠讹紝澶勭悊鍑芥暟閲岃皟鐢?`esp_wifi_connect()` 鍙戣捣瀹為檯鐨?AP 杩炴帴銆?
-#### 鐘舵€?锛欴ISCONNECTED 鈫?閲嶈瘯鎴栭噸鍚?
+WiFi 驱动初始化完成后自动触发此事件，处理函数里调用 `esp_wifi_connect()` 发起实际的 AP 连接。
+
+#### 状态2：DISCONNECTED → 重试或重启
+
 ```
-杩炴帴澶辫触/鏂紑 鈹€鈫?[WIFI_EVENT_STA_DISCONNECTED] 鈹€鈫?retry < 5 ? 閲嶈瘯 : 鏀惧純
+连接失败/断开 ─→ [WIFI_EVENT_STA_DISCONNECTED] ─→ retry < 5 ? 重试 : 放弃
 ```
 
 ```c
 if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
     if (s_retry_num < WIFI_MAXIMUM_RETRY) {     // WIFI_MAXIMUM_RETRY = 5
-        esp_wifi_connect();                      // 閲嶈瘯
+        esp_wifi_connect();                      // 重试
         s_retry_num++;
     } else {
         xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-        // 5 娆″け璐ュ悗涓嶅啀閲嶈瘯锛?鍒嗛挓鍚庤嚜鍔ㄩ噸鍚繘 Soft-AP 妯″紡
+        // 5 次失败后不再重试，5分钟后自动重启进 Soft-AP 模式
     }
 }
 ```
 
-#### 鐘舵€?锛欸OT_IP 鈫?鍚姩 pkt_fwd 浠诲姟
+#### 状态3：GOT_IP → 启动 pkt_fwd 任务
 
 ```
-DHCP 鑾峰彇鍒?IP 鈹€鈫?[IP_EVENT_STA_GOT_IP] 鈹€鈫?鍒涘缓 pkt_fwd_task
+DHCP 获取到 IP ─→ [IP_EVENT_STA_GOT_IP] ─→ 创建 pkt_fwd_task
 ```
 
 ```c
@@ -421,39 +474,50 @@ if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
 
     wifi_ready = true;
 
-    // WiFi 杩炴帴鎴愬姛锛屼繚瀛?wifi_mode 涓?station
+    // WiFi 连接成功，保存 wifi_mode 为 station
     config_wifi_mode(WIFI_MODE_STATION);
 
-    // 鍙栨秷閲嶅惎瀹氭椂鍣?    reboot_flag = false;
+    // 取消重启定时器
+    reboot_flag = false;
 
-    // 鍒涘缓鏍稿績浠诲姟锛?6KB 鏍堬紝浼樺厛绾?6
+    // 创建核心任务！16KB 栈，优先级 6
     xTaskCreate(pkt_fwd_task, "pkt_fwd", 4096*4, NULL, 6, &pkt_fwd_handle);
 
-    // OLED 鏄剧ず IP 鍦板潃
+    // OLED 显示 IP 地址
     oled_show_one_line(0, 4, self_ip, 2);
 }
 ```
 
-**鍏抽敭鐐癸細**
-- `pkt_fwd_task` 鏄湪 WiFi 杩炴帴鎴愬姛鍚庢墠鍒涘缓鐨勶紝纭繚缃戠粶灏辩华
-- `config_wifi_mode(WIFI_MODE_STATION)` 鎶?NVS 涓殑妯″紡鏀瑰洖 Station锛岀‘璁?WiFi 鍙敤
-- `reboot_flag = false` 鍙栨秷 5 鍒嗛挓鑷姩閲嶅惎瀹氭椂鍣?
+**关键点：**
+- `pkt_fwd_task` 是在 WiFi 连接成功后才创建的，确保网络就绪
+- `config_wifi_mode(WIFI_MODE_STATION)` 把 NVS 中的模式改回 Station，确认 WiFi 可用
+- `reboot_flag = false` 取消 5 分钟自动重启定时器
+
 ---
 
-## 绗笁閮ㄥ垎锛歱kt_fwd_main() 鏍稿績鍒濆鍖?
-**鏂囦欢**: `lora_pkt_fwd.c` 绾︾1590琛? 
-`pkt_fwd_task()` 鏄竴涓?FreeRTOS 浠诲姟鍖呰锛屽唴閮ㄧ洿鎺ヨ皟鐢?`pkt_fwd_main()`銆?
-### 3.1 浜掓枼閲忓垱寤?
-```c
-mx_concent = xSemaphoreCreateMutex();  // SPI 鎬荤嚎浜掓枼锛堟渶閲嶈锛?mx_xcorr   = xSemaphoreCreateMutex();  // XTAL 鏍℃鍊间簰鏂?mx_timeref = xSemaphoreCreateMutex();  // GPS 鏃堕棿鍙傝€冧簰鏂?mx_meas_up = xSemaphoreCreateMutex();  // 涓婅缁熻浜掓枼
-mx_meas_dw = xSemaphoreCreateMutex();  // 涓嬭缁熻浜掓枼
-mx_meas_gps = xSemaphoreCreateMutex(); // GPS 缁熻浜掓枼
-mx_stat_rep = xSemaphoreCreateMutex(); // 鐘舵€佹姤鍛婁簰鏂?```
+## 第三部分：pkt_fwd_main() 核心初始化
 
-`mx_concent` 鏄渶鏍稿績鐨勪簰鏂ラ噺鈥斺€擲X1302 鍙湁涓€鏉?SPI 鎬荤嚎锛屽涓嚎绋嬪悓鏃惰闂細鍐茬獊锛屾墍浠ユ墍鏈?`lgw_*()` 璋冪敤閮藉繀椤诲湪 `mx_concent` 淇濇姢涓嬫墽琛屻€?
-### 3.2 JSON 閰嶇疆鍔犺浇涓庨鐜囪ˉ涓?
+**文件**: `lora_pkt_fwd.c` 约第1590行  
+`pkt_fwd_task()` 是一个 FreeRTOS 任务包装，内部直接调用 `pkt_fwd_main()`。
+
+### 3.1 互斥量创建
+
 ```c
-// 鏍规嵁 NVS 涓殑 freq_region 閫夋嫨瀵瑰簲鐨?JSON 閰嶇疆
+mx_concent = xSemaphoreCreateMutex();  // SPI 总线互斥（最重要）
+mx_xcorr   = xSemaphoreCreateMutex();  // XTAL 校正值互斥
+mx_timeref = xSemaphoreCreateMutex();  // GPS 时间参考互斥
+mx_meas_up = xSemaphoreCreateMutex();  // 上行统计互斥
+mx_meas_dw = xSemaphoreCreateMutex();  // 下行统计互斥
+mx_meas_gps = xSemaphoreCreateMutex(); // GPS 统计互斥
+mx_stat_rep = xSemaphoreCreateMutex(); // 状态报告互斥
+```
+
+`mx_concent` 是最核心的互斥量——SX1302 只有一条 SPI 总线，多个线程同时访问会冲突，所以所有 `lgw_*()` 调用都必须在 `mx_concent` 保护下执行。
+
+### 3.2 JSON 配置加载与频率补丁
+
+```c
+// 根据 NVS 中的 freq_region 选择对应的 JSON 配置
 if(strncmp(config[FREQ_REGION].val, "eu868", 5) == 0){
     conf_array = malloc(sizeof(global_eu_conf));
     memcpy(conf_array, global_eu_conf, sizeof(global_eu_conf));
@@ -461,385 +525,472 @@ if(strncmp(config[FREQ_REGION].val, "eu868", 5) == 0){
     conf_array = malloc(sizeof(global_us_conf));
     memcpy(conf_array, global_us_conf, sizeof(global_us_conf));
 } else {
-    conf_array = malloc(sizeof(global_cn_conf));  // 榛樿 cn470
+    conf_array = malloc(sizeof(global_cn_conf));  // 默认 cn470
     memcpy(conf_array, global_cn_conf, sizeof(global_cn_conf));
 }
 ```
 
-JSON 鏄紪璇戞椂宓屽叆鍒板浐浠朵腑鐨勶紙閫氳繃 `global_json.h` 涓殑瀛楃鏁扮粍锛夛紝涓嶆槸浠庢枃浠剁郴缁熷姞杞界殑銆?
-**棰戠巼琛ヤ竵锛氱洿鎺ュ湪 JSON 瀛楃涓蹭腑鏇挎崲棰戠巼鍊?*
+JSON 是编译时嵌入到固件中的（通过 `global_json.h` 中的字符数组），不是从文件系统加载的。
+
+**频率补丁：直接在 JSON 字符串中替换频率值**
 
 ```c
-// 鐢?strstr 鎵惧埌 JSON 涓涓€涓拰绗簩涓?"freq" 瀛楁
+// 用 strstr 找到 JSON 中第一个和第二个 "freq" 字段
 char *radio0_index = strstr(conf_array, "\"freq\"");
 char *radio1_index = strstr(radio0_index + 8, "\"freq\"");
 
-// 鐢?NVS 涓殑鍊艰鐩?JSON 涓殑棰戠巼锛堝繀椤诲垰濂?9 瀛楃锛屽 "486600000"锛?if(config[FREQ_RADIO0].val != NULL && config[FREQ_RADIO0].len == 9)
+// 用 NVS 中的值覆盖 JSON 中的频率（必须刚好 9 字符，如 "486600000"）
+if(config[FREQ_RADIO0].val != NULL && config[FREQ_RADIO0].len == 9)
     strncpy(radio0_index + 8, config[FREQ_RADIO0].val, 9);
 ```
 
-**涓轰粈涔堣繖涔?绮楁毚"锛?* 鍥犱负 JSON 宸茬粡缂栬瘧鍒板浐浠堕噷浜嗭紝涓嶈兘鏀圭粨鏋勶紝鍙兘鍦ㄨВ鏋愬墠鍘熷湴鏇挎崲棰戠巼鏁板瓧銆傞檺鍒舵槸棰戠巼鍊煎繀椤绘伆濂?9 浣嶆暟瀛楋紙濡?`486600000`锛夛紝鍚﹀垯闀垮害涓嶅尮閰嶅氨涓嶆浛鎹€?
-### 3.3 涓変釜 parse_* 鍑芥暟
+**为什么这么"粗暴"？** 因为 JSON 已经编译到固件里了，不能改结构，只能在解析前原地替换频率数字。限制是频率值必须恰好 9 位数字（如 `486600000`），否则长度不匹配就不替换。
+
+### 3.3 三个 parse_* 函数
 
 ```c
-parse_SX130x_configuration(conf_array);   // 瑙ｆ瀽灏勯纭欢閰嶇疆
-parse_gateway_configuration(conf_array);   // 瑙ｆ瀽缃戝叧缃戠粶閰嶇疆
-parse_debug_configuration(conf_array);     // 瑙ｆ瀽璋冭瘯閰嶇疆
+parse_SX130x_configuration(conf_array);   // 解析射频硬件配置
+parse_gateway_configuration(conf_array);   // 解析网关网络配置
+parse_debug_configuration(conf_array);     // 解析调试配置
 ```
 
 #### parse_SX130x_configuration
 
-浠?JSON 鐨?`"SX130x_conf"` 瀵硅薄涓В鏋愶細
-- `com_type`: SPI 鎴?USB
-- `com_path`: 璁惧璺緞
-- `lorawan_public`: 鏄惁浣跨敤鍏叡 LoRaWAN syncword
-- `clksrc`: 鏃堕挓婧?- `antenna_gain`: 澶╃嚎澧炵泭
-- `radio_0` / `radio_1`: 灏勯閾捐矾閰嶇疆锛堥鐜囥€佺被鍨嬨€丷SSI 娓╁害琛ュ伩绯绘暟锛?- `chan_multiSF_0` ~ `chan_multiSF_7`: 8 涓?multi-SF 淇￠亾
-- `chan_Lora_std`: 鏍囧噯 LoRa 淇￠亾
-- `chan_FSK`: FSK 淇￠亾
-- TX gain LUT: 鍙戝皠鍔熺巼鏌ユ壘琛?
+从 JSON 的 `"SX130x_conf"` 对象中解析：
+- `com_type`: SPI 或 USB
+- `com_path`: 设备路径
+- `lorawan_public`: 是否使用公共 LoRaWAN syncword
+- `clksrc`: 时钟源
+- `antenna_gain`: 天线增益
+- `radio_0` / `radio_1`: 射频链路配置（频率、类型、RSSI 温度补偿系数）
+- `chan_multiSF_0` ~ `chan_multiSF_7`: 8 个 multi-SF 信道
+- `chan_Lora_std`: 标准 LoRa 信道
+- `chan_FSK`: FSK 信道
+- TX gain LUT: 发射功率查找表
+
 #### parse_gateway_configuration
 
-浠?JSON 鐨?`"gateway_conf"` 瀵硅薄涓В鏋愶細
-- `server_address`, `serv_port_up`, `serv_port_down`: NS 鍦板潃鍜岀鍙?- `keepalive_interval`: PULL_DATA 鍙戦€侀棿闅旓紙榛樿 5 绉掞級
-- `stat_interval`: 缁熻鎶ュ憡闂撮殧锛堥粯璁?30 绉掞級
-- `forward_crc_valid/error/nocrc`: 鍖呰繃婊ゅ紑鍏?- `gps_tty_path`, `fake_gps`: GPS 閰嶇疆
-- `beacon_*`: Beacon 閰嶇疆
+从 JSON 的 `"gateway_conf"` 对象中解析：
+- `server_address`, `serv_port_up`, `serv_port_down`: NS 地址和端口
+- `keepalive_interval`: PULL_DATA 发送间隔（默认 5 秒）
+- `stat_interval`: 统计报告间隔（默认 30 秒）
+- `forward_crc_valid/error/nocrc`: 包过滤开关
+- `gps_tty_path`, `fake_gps`: GPS 配置
+- `beacon_*`: Beacon 配置
 
-### 3.4 UDP Socket 鍒涘缓涓庤繛鎺?
+### 3.4 UDP Socket 创建与连接
+
 ```c
-// NVS 鐨勫€艰鐩?JSON 鐨勯粯璁ゅ€?if(udp_host[0] == '\0')
+// NVS 的值覆盖 JSON 的默认值
+if(udp_host[0] == '\0')
     strncpy(udp_host, serv_addr, sizeof udp_host);
 if(udp_port == 0)
     udp_port = atoi(serv_port_up);
 
-// 鍒涘缓涓や釜鐙珛鐨?UDP socket
-sock_up   = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);  // 涓婅涓撶敤
-sock_down = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);  // 涓嬭涓撶敤
+// 创建两个独立的 UDP socket
+sock_up   = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);  // 上行专用
+sock_down = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);  // 下行专用
 
-// DNS 瑙ｆ瀽骞惰繛鎺?dns_loopup(udp_host, ip);
+// DNS 解析并连接
+dns_loopup(udp_host, ip);
 dest_addr.sin_addr.s_addr = inet_addr(ip);
 dest_addr.sin_port = htons(udp_port);
 
-// 涓や釜 socket 閮?connect 鍒板悓涓€涓?NS 鍦板潃
+// 两个 socket 都 connect 到同一个 NS 地址
 connect(sock_up,   (struct sockaddr *)&dest_addr, sizeof(dest_addr));
 connect(sock_down, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
 
-// 璁剧疆涓婅 socket 鐨勬帴鏀惰秴鏃?= 250ms锛坔alf of PUSH_TIMEOUT_MS=500锛?setsockopt(sock_up, SOL_SOCKET, SO_RCVTIMEO, &push_timeout_half, ...);
+// 设置上行 socket 的接收超时 = 250ms（half of PUSH_TIMEOUT_MS=500）
+setsockopt(sock_up, SOL_SOCKET, SO_RCVTIMEO, &push_timeout_half, ...);
 ```
 
-**涓轰粈涔堢敤涓や釜 socket锛?* `thread_up` 鍜?`thread_down` 杩愯鍦ㄤ笉鍚岀殑绾跨▼涓紝浣跨敤鐙珛鐨?socket 閬垮厤浜掓枼閿佸紑閿€锛屾彁楂樺苟鍙戞€ц兘銆?
-**涓轰粈涔堝 UDP socket 璋冪敤 `connect()`锛?* UDP 鐨?`connect()` 涓嶄細寤虹珛杩炴帴锛屽彧鏄粦瀹氫簡杩滅鍦板潃锛屼箣鍚庡彲浠ョ敤 `send()`/`recv()` 浠ｆ浛 `sendto()`/`recvfrom()`锛屼唬鐮佹洿绠€娲併€?
-### 3.5 SX1302 澶嶄綅涓庡惎鍔?
+**为什么用两个 socket？** `thread_up` 和 `thread_down` 运行在不同的线程中，使用独立的 socket 避免互斥锁开销，提高并发性能。
+
+**为什么对 UDP socket 调用 `connect()`？** UDP 的 `connect()` 不会建立连接，只是绑定了远端地址，之后可以用 `send()`/`recv()` 代替 `sendto()`/`recvfrom()`，代码更简洁。
+
+### 3.5 SX1302 复位与启动
+
 ```c
-// SPI 妯″紡涓嬪厛纭欢澶嶄綅 SX1302
+// SPI 模式下先硬件复位 SX1302
 if (com_type == LGW_COM_SPI)
     lgw_reset();
 
-// 鍚姩闆嗕腑鍣?i = lgw_start();
+// 启动集中器
+i = lgw_start();
 if (i == LGW_HAL_SUCCESS)
     MSG("INFO: [main] concentrator started, packet can now be received\n");
 else
     exit(EXIT_FAILURE);
 ```
 
-`lgw_start()` 鍐呴儴鍋氫簡澶ч噺宸ヤ綔锛?1. 鎵撳紑 SPI 鍜?I2C 绔彛
-2. 鎼滅储 I2C 娓╁害浼犳劅鍣紙0x39, 0x3B, 0x38锛夆啇 **瑙侀檮褰旳**
-3. 鏍″噯 SX1250 灏勯鍓嶇
-4. 閰嶇疆鎵€鏈?IF 淇￠亾鍜岃В璋冨弬鏁?5. 鍚姩 SX1302 鏁板瓧鍩哄甫
-6. 楠岃瘉鑺墖鐗堟湰鍙凤紙chip version 0x10 = v1.0锛?
-### 3.6 宸ヤ綔绾跨▼鍒涘缓
+`lgw_start()` 内部做了大量工作：
+1. 打开 SPI 和 I2C 端口
+2. 搜索 I2C 温度传感器（0x39, 0x3B, 0x38）← **见附录A**
+3. 校准 SX1250 射频前端
+4. 配置所有 IF 信道和解调参数
+5. 启动 SX1302 数字基带
+6. 验证芯片版本号（chip version 0x10 = v1.0）
+
+### 3.6 工作线程创建
 
 ```c
-// LED 鎸囩ず鐏畧鎶ょ嚎绋?xTaskCreatePinnedToCore(vDaemonLedIndication, "led_flash", 4096, NULL, 1, NULL, tskNO_AFFINITY);
+// LED 指示灯守护线程
+xTaskCreatePinnedToCore(vDaemonLedIndication, "led_flash", 4096, NULL, 1, NULL, tskNO_AFFINITY);
 
-// JIT 闃熷垪鍒濆鍖栵紙涓ゆ潯 RF 閾捐矾鍚勪竴涓槦鍒楋級
+// JIT 队列初始化（两条 RF 链路各一个队列）
 jit_queue_init(&jit_queue[0]);
 jit_queue_init(&jit_queue[1]);
 
-// 涓婅绾跨▼锛?6KB 鏍堬紝浼樺厛绾?6锛?xTaskCreatePinnedToCore(thread_up,   "thread_up",   4096*4, NULL, 6, &pThreadUp, tskNO_AFFINITY);
+// 上行线程（16KB 栈，优先级 6）
+xTaskCreatePinnedToCore(thread_up,   "thread_up",   4096*4, NULL, 6, &pThreadUp, tskNO_AFFINITY);
 
-// 涓嬭绾跨▼锛?KB 鏍堬紝浼樺厛绾?6锛?xTaskCreatePinnedToCore(thread_down, "thread_down",  4096*2, NULL, 6, NULL, tskNO_AFFINITY);
+// 下行线程（8KB 栈，优先级 6）
+xTaskCreatePinnedToCore(thread_down, "thread_down",  4096*2, NULL, 6, NULL, tskNO_AFFINITY);
 
-// JIT 绾跨▼锛?KB 鏍堬紝浼樺厛绾?6锛?xTaskCreatePinnedToCore(thread_jit,  "thread_jit",   4096*2, NULL, 6, NULL, tskNO_AFFINITY);
+// JIT 线程（8KB 栈，优先级 6）
+xTaskCreatePinnedToCore(thread_jit,  "thread_jit",   4096*2, NULL, 6, NULL, tskNO_AFFINITY);
 ```
 
-`tskNO_AFFINITY` 琛ㄧず绾跨▼鍙互鍦?ESP32-S3 鐨勪换鎰忎竴涓?CPU 鏍稿績涓婅繍琛屻€?
-### 3.7 涓诲惊鐜細缁熻鏀堕泦
+`tskNO_AFFINITY` 表示线程可以在 ESP32-S3 的任意一个 CPU 核心上运行。
+
+### 3.7 主循环：统计收集
 
 ```c
 while (!exit_sig && !quit_sig) {
-    // 姣?5 绉掑埛鏂颁竴娆?OLED 鏃堕棿鏄剧ず
+    // 每 5 秒刷新一次 OLED 时间显示
     while(time_count < stat_interval) {
         vTaskDelay(1000 * TIME_REFRESH / portTICK_PERIOD_MS);
         time_count += TIME_REFRESH;
-        // 鏇存柊 OLED 鏃堕棿
+        // 更新 OLED 时间
     }
 
-    // 姣?stat_interval (30s) 鏀堕泦涓€娆＄粺璁?    // 1. 鍔犻攣璇诲彇 + 娓呴浂涓婅缁熻
+    // 每 stat_interval (30s) 收集一次统计
+    // 1. 加锁读取 + 清零上行统计
     xSemaphoreTake(mx_meas_up, portMAX_DELAY);
     cp_nb_rx_rcv = meas_nb_rx_rcv; meas_nb_rx_rcv = 0;
-    // ... 鍏朵粬瀛楁 ...
+    // ... 其他字段 ...
     xSemaphoreGive(mx_meas_up);
 
-    // 2. 鍔犻攣璇诲彇 + 娓呴浂涓嬭缁熻
+    // 2. 加锁读取 + 清零下行统计
     xSemaphoreTake(mx_meas_dw, portMAX_DELAY);
     // ...
     xSemaphoreGive(mx_meas_dw);
 
-    // 3. 璇诲彇娓╁害锛堝姞 SPI 浜掓枼閿侊級
+    // 3. 读取温度（加 SPI 互斥锁）
     xSemaphoreTake(mx_concent, portMAX_DELAY);
     i = lgw_get_temperature(&temperature);
     xSemaphoreGive(mx_concent);
 
-    // 4. 鎵撳嵃缁熻鎶ュ憡鍒颁覆鍙?    printf("##### %s #####\n", stat_timestamp);
+    // 4. 打印统计报告到串口
+    printf("##### %s #####\n", stat_timestamp);
     printf("# RF packets received: %u\n", cp_nb_rx_rcv);
     // ...
 
-    // 5. 缁勮 JSON 鐘舵€佹姤鍛婏紙缁?thread_up 鍙戦€侊級
+    // 5. 组装 JSON 状态报告（给 thread_up 发送）
     xSemaphoreTake(mx_stat_rep, portMAX_DELAY);
     snprintf(status_report, STATUS_SIZE,
         "\"stat\":{\"time\":\"%s\",\"rxnb\":%u,\"rxok\":%u,...,\"temp\":%.1f}",
         ...);
-    report_ready = true;  // 閫氱煡 thread_up 涓嬫鍙戝寘鏃跺甫涓婄姸鎬?    xSemaphoreGive(mx_stat_rep);
+    report_ready = true;  // 通知 thread_up 下次发包时带上状态
+    xSemaphoreGive(mx_stat_rep);
 }
 ```
 
 ---
 
-## 绗洓閮ㄥ垎锛氫笁澶ф牳蹇冪嚎绋嬭瑙?
-### 绾跨▼鍗忎綔鍏ㄦ櫙鍥?
+## 第四部分：三大核心线程详解
+
+### 线程协作全景图
+
 ```
-SX1302 纭欢                thread_up              Network Server (NS)
-   鈹?                          鈹?                        鈹?   鈹?鏈夊寘鍒拌揪                   鈹?                        鈹?   鈹傗攢鈹€lgw_receive()鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈻衡攤                         鈹?   鈹?                          鈹?缁勮JSON                 鈹?   鈹?                          鈹傗攢鈹€PUSH_DATA鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈻衡攤
-   鈹?                          鈹傗梽鈹€PUSH_ACK鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?   鈹?                          鈹?                        鈹?   鈹?                          鈹?       thread_down       鈹?   鈹?                          鈹傗梽鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€  鈹?   鈹?                          鈹?       PULL_DATA         鈹?   鈹?                          鈹傗攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈻衡攤
-   鈹?                          鈹傗梽鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?   鈹?                          鈹?       PULL_ACK          鈹?   鈹?                          鈹傗梽鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?   鈹?                          鈹?       PULL_RESP(涓嬭鍖?  鈹?   鈹?                     jit_queue                       鈹?   鈹傗梽鈹€鈹€lgw_send()鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                        鈹?   鈹?  thread_jit 鍙戝皠          鈹?                        鈹?```
+SX1302 硬件                thread_up              Network Server (NS)
+   │                           │                         │
+   │ 有包到达                   │                         │
+   │──lgw_receive()────────────►│                         │
+   │                           │ 组装JSON                 │
+   │                           │──PUSH_DATA──────────────►│
+   │                           │◄─PUSH_ACK────────────────│
+   │                           │                         │
+   │                           │        thread_down       │
+   │                           │◄───────────────────────  │
+   │                           │        PULL_DATA         │
+   │                           │─────────────────────────►│
+   │                           │◄─────────────────────────│
+   │                           │        PULL_ACK          │
+   │                           │◄─────────────────────────│
+   │                           │        PULL_RESP(下行包)  │
+   │                      jit_queue                       │
+   │◄──lgw_send()──────────────│                         │
+   │   thread_jit 发射          │                         │
+```
 
-### 4.1 thread_up 鈥?涓婅绾跨▼
+### 4.1 thread_up — 上行线程
 
-**鏂囦欢**: `lora_pkt_fwd.c` 绾︾2145琛?
-#### 涓诲惊鐜粨鏋?
+**文件**: `lora_pkt_fwd.c` 约第2145行
+
+#### 主循环结构
+
 ```c
 void thread_up(void)
 {
-    // 棰勫～鍏呭浐瀹氭姤鏂囧ご锛堝崗璁増鏈?+ 绫诲瀷 + 缃戝叧MAC锛?    buff_up[0] = PROTOCOL_VERSION;   // = 2
+    // 预填充固定报文头（协议版本 + 类型 + 网关MAC）
+    buff_up[0] = PROTOCOL_VERSION;   // = 2
     buff_up[3] = PKT_PUSH_DATA;      // = 0
-    *(unsigned int *)(buff_up + 4) = net_mac_h;  // 缃戝叧ID楂?2浣?    *(unsigned int *)(buff_up + 8) = net_mac_l;  // 缃戝叧ID浣?2浣?
+    *(unsigned int *)(buff_up + 4) = net_mac_h;  // 网关ID高32位
+    *(unsigned int *)(buff_up + 8) = net_mac_l;  // 网关ID低32位
+
     while (!exit_sig && !quit_sig) {
 
-        // 鈶?浠?SX1302 鍙栧寘锛堝姞 SPI 浜掓枼閿侊級
+        // ① 从 SX1302 取包（加 SPI 互斥锁）
         xSemaphoreTake(mx_concent, portMAX_DELAY);
-        nb_pkt = lgw_receive(NB_PKT_MAX, rxpkt);  // 鏈€澶氬彇24涓寘
+        nb_pkt = lgw_receive(NB_PKT_MAX, rxpkt);  // 最多取24个包
         xSemaphoreGive(mx_concent);
 
-        // 鈶?妫€鏌ユ槸鍚︽湁鐘舵€佹姤鍛婅鍙?        send_report = report_ready;
+        // ② 检查是否有状态报告要发
+        send_report = report_ready;
 
-        // 鈶?娌℃湁鍖呬篃娌℃湁鎶ュ憡 鈫?鐫?0ms缁х画
+        // ③ 没有包也没有报告 → 睡10ms继续
         if ((nb_pkt == 0) && (send_report == false)) {
             vTaskDelay(FETCH_SLEEP_MS / portTICK_PERIOD_MS); // 10ms
             continue;
         }
 
-        // 鈶?鏈夊寘鍒欓棯鐑佷笂琛孡ED
+        // ④ 有包则闪烁上行LED
         if (nb_pkt > 0)
             vUplinkFlash(10);
 
-        // 鈶?閫愬寘澶勭悊锛岀粍瑁匤SON
-        // 鈶?鍙戦€乁DP锛岀瓑寰匒CK
+        // ⑤ 逐包处理，组装JSON
+        // ⑥ 发送UDP，等待ACK
     }
 }
 ```
 
-#### PUSH_DATA UDP 鎶ユ枃缁撴瀯
+#### PUSH_DATA UDP 报文结构
 
 ```
-瀛楄妭鍋忕Щ  闀垮害   鍐呭
-鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€  鈹€鈹€鈹€鈹€   鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-0         1      鍗忚鐗堟湰 = 0x02
-1-2       2      闅忔満 token锛堢敤浜庡尮閰?ACK锛?3         1      鎶ユ枃绫诲瀷 = 0x00 (PUSH_DATA)
-4-7       4      缃戝叧 MAC 楂?2浣嶏紙缃戠粶瀛楄妭搴忥級
-8-11      4      缃戝叧 MAC 浣?2浣嶏紙缃戠粶瀛楄妭搴忥級
-12+       N      JSON 瀛楃涓?```
+字节偏移  长度   内容
+────────  ────   ──────────────────────────────────────
+0         1      协议版本 = 0x02
+1-2       2      随机 token（用于匹配 ACK）
+3         1      报文类型 = 0x00 (PUSH_DATA)
+4-7       4      网关 MAC 高32位（网络字节序）
+8-11      4      网关 MAC 低32位（网络字节序）
+12+       N      JSON 字符串
+```
 
-#### 鍖呰繃婊ら€昏緫
+#### 包过滤逻辑
 
 ```c
 switch(p->status) {
     case STAT_CRC_OK:
         meas_nb_rx_ok += 1;
-        if (!fwd_valid_pkt) continue;  // JSON 閰嶇疆 forward_crc_valid=false 鍒欎涪寮?        break;
+        if (!fwd_valid_pkt) continue;  // JSON 配置 forward_crc_valid=false 则丢弃
+        break;
     case STAT_CRC_BAD:
         meas_nb_rx_bad += 1;
-        if (!fwd_error_pkt) continue;  // 榛樿涓㈠純CRC閿欒鍖?        break;
+        if (!fwd_error_pkt) continue;  // 默认丢弃CRC错误包
+        break;
     case STAT_NO_CRC:
         meas_nb_rx_nocrc += 1;
-        if (!fwd_nocrc_pkt) continue;  // 榛樿涓㈠純鏃燙RC鍖?        break;
+        if (!fwd_nocrc_pkt) continue;  // 默认丢弃无CRC包
+        break;
 }
 ```
 
-#### JSON rxpk 瀛楁璇﹁В
+#### JSON rxpk 字段详解
 
-| 瀛楁 | 鏉ユ簮 | 鍚箟 |
+| 字段 | 来源 | 含义 |
 |---|---|---|
-| `tmst` | `p->count_us` | SX1302 鍐呴儴鑷敱璁℃暟鍣紙碌s锛夛紝涓嬭瀵归綈鐢?|
-| `chan` | `p->if_chain` | 鎺ユ敹淇￠亾鍙凤紙0-7=multiSF, 8=std, 9=FSK锛?|
-| `rfch` | `p->rf_chain` | 灏勯閾捐矾鍙凤紙0鎴?锛?|
-| `freq` | `p->freq_hz/1e6` | 鎺ユ敹棰戠巼锛圡Hz锛?|
-| `mid` | `p->modem_id` | 瑙ｈ皟鍣↖D |
-| `stat` | `p->status` | CRC鐘舵€侊細1=OK, -1=閿欒, 0=鏃燙RC |
-| `modu` | `p->modulation` | 璋冨埗鏂瑰紡锛歀ORA 鎴?FSK |
-| `datr` | `p->datarate+bandwidth` | 鏁版嵁閫熺巼锛氬 "SF12BW125" |
-| `codr` | `p->coderate` | 缂栫爜鐜囷細4/5, 4/6, 4/7, 4/8 |
-| `rssis` | `p->rssis` | 淇″彿 RSSI锛坉Bm锛夛紝宸叉俯搴﹁ˉ鍋?|
-| `lsnr` | `p->snr` | LoRa SNR锛坉B锛?|
-| `foff` | `p->freq_offset` | 棰戠巼鍋忕Щ锛圚z锛夛紝鍙嶆槧缁堢鏅舵尟璇樊 |
-| `rssi` | `p->rssic` | 淇￠亾 RSSI锛坉Bm锛?|
-| `size` | `p->size` | 杞借嵎瀛楄妭鏁?|
-| `data` | `p->payload` | Base64 缂栫爜鐨勮浇鑽?|
+| `tmst` | `p->count_us` | SX1302 内部自由计数器（µs），下行对齐用 |
+| `chan` | `p->if_chain` | 接收信道号（0-7=multiSF, 8=std, 9=FSK） |
+| `rfch` | `p->rf_chain` | 射频链路号（0或1） |
+| `freq` | `p->freq_hz/1e6` | 接收频率（MHz） |
+| `mid` | `p->modem_id` | 解调器ID |
+| `stat` | `p->status` | CRC状态：1=OK, -1=错误, 0=无CRC |
+| `modu` | `p->modulation` | 调制方式：LORA 或 FSK |
+| `datr` | `p->datarate+bandwidth` | 数据速率：如 "SF12BW125" |
+| `codr` | `p->coderate` | 编码率：4/5, 4/6, 4/7, 4/8 |
+| `rssis` | `p->rssis` | 信号 RSSI（dBm），已温度补偿 |
+| `lsnr` | `p->snr` | LoRa SNR（dB） |
+| `foff` | `p->freq_offset` | 频率偏移（Hz），反映终端晶振误差 |
+| `rssi` | `p->rssic` | 信道 RSSI（dBm） |
+| `size` | `p->size` | 载荷字节数 |
+| `data` | `p->payload` | Base64 编码的载荷 |
 
-#### 娓呯┖鏃?ACK + 鍙戦€?+ 绛夊緟鏈哄埗
+#### 清空旧 ACK + 发送 + 等待机制
 
 ```c
-// 鈽?鍙戦€佸墠鍏堟竻绌?socket 缂撳啿鍖洪噷鐨勬棫 ACK
+// ★ 发送前先清空 socket 缓冲区里的旧 ACK
 uint8_t _tmp[4];
 while (recv(sock_up, (void *)_tmp, sizeof _tmp, MSG_DONTWAIT) > 0) {}
 
-// 鍙戦€?PUSH_DATA
+// 发送 PUSH_DATA
 send(sock_up, (void *)buff_up, buff_index, 0);
 
-// 绛夊緟 PUSH_ACK锛堟渶澶氫袱杞紝姣忚疆 250ms锛?for (i=0; i<2; ++i) {
+// 等待 PUSH_ACK（最多两轮，每轮 250ms）
+for (i=0; i<2; ++i) {
     j = recv(sock_up, (void *)buff_ack, sizeof buff_ack, 0);
-    // sock_up 宸茶 SO_RCVTIMEO = 250ms
+    // sock_up 已设 SO_RCVTIMEO = 250ms
 
     if (j == -1 && errno == EAGAIN)
-        continue;  // 瓒呮椂锛屽啀绛変竴杞?
-    // 楠岃瘉锛氬崗璁増鏈€佹姤鏂囩被鍨嬨€乼oken 鍖归厤
+        continue;  // 超时，再等一轮
+
+    // 验证：协议版本、报文类型、token 匹配
     if (buff_ack[1]==token_h && buff_ack[2]==token_l) {
         MSG("INFO: [up] PUSH_ACK received in %i ms\n", ...);
         meas_up_ack_rcv += 1;
-        vBackhaulFlash(10);  // 闂儊鍥炰紶LED
+        vBackhaulFlash(10);  // 闪烁回传LED
         break;
     }
 }
 ```
 
-**涓轰粈涔堝彂閫佸墠瑕佹竻绌烘棫 ACK锛?*  
-涓婁竴杞?PUSH_DATA 濡傛灉瓒呮椂浜嗕絾 ACK 鍏跺疄宸茬粡鍦ㄨ矾涓婏紝浼氬湪杩欒疆鍙戦€佸墠鎶佃揪 socket 缂撳啿鍖恒€備笉娓呯┖鐨勮瘽锛岃繖涓棫 ACK 浼氳璇涓烘槸鏂扮殑 PUSH_ACK锛屽鑷?`ackr`锛圓CK 鐜囷級缁熻铏氶珮銆?
-**涓轰粈涔堢瓑涓よ疆锛?*  
-缃戠粶鎶栧姩鍙兘瀵艰嚧 ACK 姣旈鏈熸櫄鍒帮紝涓よ疆鍏?500ms 鐨勭瓑寰呯獥鍙ｅ鍔犱簡鏀跺埌 ACK 鐨勬鐜囥€?
-### 4.2 thread_down 鈥?涓嬭绾跨▼
+**为什么发送前要清空旧 ACK？**  
+上一轮 PUSH_DATA 如果超时了但 ACK 其实已经在路上，会在这轮发送前抵达 socket 缓冲区。不清空的话，这个旧 ACK 会被误认为是新的 PUSH_ACK，导致 `ackr`（ACK 率）统计虚高。
 
-**鏂囦欢**: `lora_pkt_fwd.c` 绾︾2770琛?
-#### 涓诲惊鐜粨鏋?
+**为什么等两轮？**  
+网络抖动可能导致 ACK 比预期晚到，两轮共 500ms 的等待窗口增加了收到 ACK 的概率。
+
+### 4.2 thread_down — 下行线程
+
+**文件**: `lora_pkt_fwd.c` 约第2770行
+
+#### 主循环结构
+
 ```c
 void thread_down(void)
 {
-    // 棰勫～鍏?PULL_DATA 鎶ユ枃澶?    buff_req[0] = PROTOCOL_VERSION;
+    // 预填充 PULL_DATA 报文头
+    buff_req[0] = PROTOCOL_VERSION;
     buff_req[3] = PKT_PULL_DATA;  // = 0x02
     *(unsigned int *)(buff_req + 4) = net_mac_h;
     *(unsigned int *)(buff_req + 8) = net_mac_l;
 
     while (!exit_sig && !quit_sig) {
 
-        // 鈶?autoquit 妫€娴嬶細濡傛灉杩炵画 N 娆?PULL_DATA 閮芥病鏀跺埌 ACK锛岄€€鍑?        if ((autoquit_threshold > 0) && (autoquit_cnt >= autoquit_threshold))
+        // ① autoquit 检测：如果连续 N 次 PULL_DATA 都没收到 ACK，退出
+        if ((autoquit_threshold > 0) && (autoquit_cnt >= autoquit_threshold))
             exit_sig = true;
 
-        // 鈶?鍙戦€?PULL_DATA
+        // ② 发送 PULL_DATA
         token_h = rand(); token_l = rand();
         buff_req[1] = token_h; buff_req[2] = token_l;
         send(sock_down, buff_req, sizeof buff_req, 0);
 
-        // 鈶?鍦?keepalive_time(10s) 鏃堕棿绐楀彛鍐呮寔缁洃鍚?        while (difftimespec(recv_time, send_time) < keepalive_time) {
+        // ③ 在 keepalive_time(10s) 时间窗口内持续监听
+        while (difftimespec(recv_time, send_time) < keepalive_time) {
             msg_len = recv(sock_down, buff_down, sizeof buff_down, 0);
-            // sock_down 璁?SO_RCVTIMEO = 400ms
-            // 姣忔瓒呮椂灏辩户缁惊鐜紝鐩村埌 keepalive_time 鍒版湡
+            // sock_down 设 SO_RCVTIMEO = 400ms
+            // 每次超时就继续循环，直到 keepalive_time 到期
 
-            if (msg_len == -1) continue;  // 瓒呮椂
+            if (msg_len == -1) continue;  // 超时
 
-            // 鈶?澶勭悊 PULL_ACK
+            // ④ 处理 PULL_ACK
             if (buff_down[3] == PKT_PULL_ACK) { ... }
 
-            // 鈶?澶勭悊 PULL_RESP锛堜笅琛屽寘锛?            if (buff_down[3] == PKT_PULL_RESP) { ... }
+            // ⑤ 处理 PULL_RESP（下行包）
+            if (buff_down[3] == PKT_PULL_RESP) { ... }
         }
     }
 }
 ```
 
-#### PULL_DATA / PULL_ACK 鏃跺簭
+#### PULL_DATA / PULL_ACK 时序
 
 ```
 thread_down                              NS
-    鈹?                                    鈹?    鈹傗攢鈹€PULL_DATA(token=0xA1B2)鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈻衡攤
-    鈹傗梽鈹€PULL_ACK(token=0xA1B2)鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? (瀹炴祴绾?43ms)
-    鈹?                                    鈹?    鈹? ...鐩戝惉鏈€澶?10 绉?..                鈹?    鈹?                                    鈹?    鈹? (濡傛灉鏈変笅琛屽寘):                      鈹?    鈹傗梽鈹€PULL_RESP(txpk={...})鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?    鈹? 瑙ｆ瀽JSON 鈫?jit_enqueue()           鈹?    鈹傗攢鈹€TX_ACK(token)鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈻衡攤
-    鈹?                                    鈹?    鈹傗攢鈹€PULL_DATA(token=0xC3D4)鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈻衡攤 (10绉掑悗鍐嶆潵涓€娆?
+    │                                     │
+    │──PULL_DATA(token=0xA1B2)───────────►│
+    │◄─PULL_ACK(token=0xA1B2)────────────│  (实测约143ms)
+    │                                     │
+    │  ...监听最多 10 秒...                │
+    │                                     │
+    │  (如果有下行包):                      │
+    │◄─PULL_RESP(txpk={...})─────────────│
+    │  解析JSON → jit_enqueue()           │
+    │──TX_ACK(token)─────────────────────►│
+    │                                     │
+    │──PULL_DATA(token=0xC3D4)───────────►│ (10秒后再来一次)
 ```
 
-#### PULL_RESP 瑙ｆ瀽 鈥?涓夌涓嬭妯″紡
+#### PULL_RESP 解析 — 三种下行模式
 
-| 妯″紡 | JSON 瀛楁 | LoRaWAN Class | 璇存槑 |
+| 模式 | JSON 字段 | LoRaWAN Class | 说明 |
 |---|---|---|---|
-| 绔嬪嵆鍙戝皠 | `"imme": true` | Class C | 涓嶉渶瑕佹椂闂存埑锛岀珛鍒诲彂 |
-| 鏃堕棿鎴冲彂灏?| `"tmst": 3784146` | Class A | 鍦ㄦ寚瀹?SX1302 璁℃暟鍣ㄥ€兼椂鍙?|
-| GPS鏃堕棿鍙戝皠 | `"tmms": 1234567890` | Class B | 鍦ㄦ寚瀹?GPS 姣鏃跺埢鍙?|
+| 立即发射 | `"imme": true` | Class C | 不需要时间戳，立刻发 |
+| 时间戳发射 | `"tmst": 3784146` | Class A | 在指定 SX1302 计数器值时发 |
+| GPS时间发射 | `"tmms": 1234567890` | Class B | 在指定 GPS 毫秒时刻发 |
 
-**Class A锛堟渶甯歌锛夛細** NS 鎶婁笂琛屽寘鐨?`tmst` 鍔犱笂 RX1Delay锛?绉掞級浣滀负涓嬭鐨?`tmst`銆?
-#### PULL_RESP 澶勭悊娴佺▼
+**Class A（最常见）：** NS 把上行包的 `tmst` 加上 RX1Delay（1秒）作为下行的 `tmst`。
+
+#### PULL_RESP 处理流程
 
 ```c
-// 瑙ｆ瀽 JSON 鈫?濉厖 txpkt 缁撴瀯浣?// 鍖呭惈: freq, rfch, powe, modu, datr, codr, ipol, size, data
+// 解析 JSON → 填充 txpkt 结构体
+// 包含: freq, rfch, powe, modu, datr, codr, ipol, size, data
 
-// 妫€鏌ラ鐜囪寖鍥?if (txpkt.freq_hz < tx_freq_min[...] || txpkt.freq_hz > tx_freq_max[...])
+// 检查频率范围
+if (txpkt.freq_hz < tx_freq_min[...] || txpkt.freq_hz > tx_freq_max[...])
     jit_result = JIT_ERROR_TX_FREQ;
 
-// 妫€鏌ュ彂灏勫姛鐜囷紙鏌ヨ〃鎵炬渶鎺ヨ繎鐨勬敮鎸佸€硷級
+// 检查发射功率（查表找最接近的支持值）
 get_tx_gain_lut_index(txpkt.rf_chain, txpkt.rf_power, &tx_lut_idx);
 
-// 鏀惧叆 JIT 闃熷垪锛堜笉绔嬪嵆鍙戝皠锛?jit_enqueue(&jit_queue[txpkt.rf_chain], current_concentrator_time, &txpkt, downlink_type);
+// 放入 JIT 队列（不立即发射）
+jit_enqueue(&jit_queue[txpkt.rf_chain], current_concentrator_time, &txpkt, downlink_type);
 
-// 鍥炲 TX_ACK 缁?NS
+// 回复 TX_ACK 给 NS
 send_tx_ack(buff_down[1], buff_down[2], jit_result, warning_value);
 ```
 
-### 4.3 thread_jit 鈥?JIT 瀹氭椂鍙戝皠绾跨▼
+### 4.3 thread_jit — JIT 定时发射线程
 
-**鏂囦欢**: `lora_pkt_fwd.c` 绾︾3456琛?
-JIT = Just In Time锛堟伆濂藉強鏃讹級銆備笅琛屽寘涓嶈兘鎯冲彂灏卞彂锛屽繀椤诲湪**绮剧‘鐨勬椂鍒?*鍙戝皠锛屽惁鍒欑粓绔妭鐐圭殑鎺ユ敹绐楀彛宸插叧闂€?
-#### 涓诲惊鐜粨鏋?
+**文件**: `lora_pkt_fwd.c` 约第3456行
+
+JIT = Just In Time（恰好及时）。下行包不能想发就发，必须在**精确的时刻**发射，否则终端节点的接收窗口已关闭。
+
+#### 主循环结构
+
 ```c
 void thread_jit(void)
 {
     while (!exit_sig && !quit_sig) {
-        vTaskDelay(10 / portTICK_PERIOD_MS);  // 姣?10ms 妫€鏌ヤ竴娆?
-        for (i = 0; i < LGW_RF_CHAIN_NB; i++) {  // 閬嶅巻涓ゆ潯 RF 閾捐矾
+        vTaskDelay(10 / portTICK_PERIOD_MS);  // 每 10ms 检查一次
 
-            // 鈶?璇诲彇褰撳墠 SX1302 璁℃暟鍣ㄥ€?            xSemaphoreTake(mx_concent, portMAX_DELAY);
+        for (i = 0; i < LGW_RF_CHAIN_NB; i++) {  // 遍历两条 RF 链路
+
+            // ① 读取当前 SX1302 计数器值
+            xSemaphoreTake(mx_concent, portMAX_DELAY);
             lgw_get_instcnt(&current_concentrator_time);
             xSemaphoreGive(mx_concent);
 
-            // 鈶?鏌ョ湅闃熷垪澶撮儴鏄惁鍒版湡
+            // ② 查看队列头部是否到期
             jit_result = jit_peek(&jit_queue[i], current_concentrator_time, &pkt_index);
 
             if (jit_result == JIT_ERROR_OK && pkt_index > -1) {
 
-                // 鈶?鍙栧嚭鍖?                jit_dequeue(&jit_queue[i], pkt_index, &pkt, &pkt_type);
+                // ③ 取出包
+                jit_dequeue(&jit_queue[i], pkt_index, &pkt, &pkt_type);
 
-                // 鈶?Beacon 棰戠巼琛ュ伩锛堟櫠鎸牎姝ｏ級
+                // ④ Beacon 频率补偿（晶振校正）
                 if (pkt_type == JIT_PKT_TYPE_BEACON) {
                     xSemaphoreTake(mx_xcorr, portMAX_DELAY);
                     pkt.freq_hz = (unsigned int)(xtal_correct * (double)pkt.freq_hz);
                     xSemaphoreGive(mx_xcorr);
                 }
 
-                // 鈶?妫€鏌?TX 鐘舵€?                lgw_status(pkt.rf_chain, TX_STATUS, &tx_status);
-                if (tx_status == TX_EMITTING) continue;  // 姝ｅ湪鍙戝皠锛岃烦杩?
-                // 鈶?鍙戝皠锛?                xSemaphoreTake(mx_concent, portMAX_DELAY);
+                // ⑤ 检查 TX 状态
+                lgw_status(pkt.rf_chain, TX_STATUS, &tx_status);
+                if (tx_status == TX_EMITTING) continue;  // 正在发射，跳过
+
+                // ⑥ 发射！
+                xSemaphoreTake(mx_concent, portMAX_DELAY);
                 result = lgw_send(&pkt);
                 xSemaphoreGive(mx_concent);
 
                 if (result == LGW_HAL_SUCCESS) {
                     meas_nb_tx_ok += 1;
-                    vDownlinkFlash(10);  // 闂儊涓嬭LED
+                    vDownlinkFlash(10);  // 闪烁下行LED
                 } else {
                     meas_nb_tx_fail += 1;
                 }
@@ -849,68 +1000,88 @@ void thread_jit(void)
 }
 ```
 
-#### JIT 闃熷垪鏃堕棿绾跨ず渚?
-```
-涓婅鍖呭埌杈? tmst = 3,784,146 碌s
-                鈹?                鈹? NS 鏀跺埌涓婅鍖咃紝璁＄畻涓嬭鏃跺埢
-                鈹? RX1: tmst + 1,000,000 = 4,784,146 碌s
-                鈹?thread_down: jit_enqueue(count_us=4,784,146)
-                鈹?                鈹? thread_jit 姣?10ms 妫€鏌?                鈹?current_time 鈮?4,783,146 碌s  鈫?jit_peek(): "杩樺樊绾?ms锛屾椂鏈哄凡鍒?
-                鈹?                鈻?            lgw_send(&pkt)  鈫?SPI 鍐欏叆 SX1302
-                鈹?current_time = 4,784,146 碌s
-                鈹?                鈻?            SX1302 纭欢鍦ㄧ簿纭椂鍒诲彂灏勫皠棰戜俊鍙?            缁堢鑺傜偣鐨?RX1 绐楀彛姝ｅソ鎵撳紑 鈫?鎴愬姛鎺ユ敹
-```
-
-### 4.4 涓夌嚎绋嬪崗浣滃畬鏁存暟鎹祦
-
-浠ヤ竴娆″畬鏁寸殑 Class A 涓婁笅琛屼氦浜掍负渚嬶細
+#### JIT 队列时间线示例
 
 ```
-鏃堕棿杞?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈻?
-[SX1302 纭欢]
-  t=3,784,146碌s: 缁堢鍙戞潵涓婅鍖咃紝SX1302 鎺ユ敹瀹屾垚
+上行包到达: tmst = 3,784,146 µs
+                │
+                │  NS 收到上行包，计算下行时刻
+                │  RX1: tmst + 1,000,000 = 4,784,146 µs
+                │
+thread_down: jit_enqueue(count_us=4,784,146)
+                │
+                │  thread_jit 每 10ms 检查
+                │
+current_time ≈ 4,783,146 µs  → jit_peek(): "还差约1ms，时机已到"
+                │
+                ▼
+            lgw_send(&pkt)  → SPI 写入 SX1302
+                │
+current_time = 4,784,146 µs
+                │
+                ▼
+            SX1302 硬件在精确时刻发射射频信号
+            终端节点的 RX1 窗口正好打开 → 成功接收
+```
 
-[thread_up] (姣?0ms杞)
-  t鈮?,784,156碌s: lgw_receive() 鍙栧嚭鍖?                 CRC_OK 鈫?閫氳繃杩囨护
-                 缁勮JSON: {"rxpk":[{"tmst":3784146,...}]}
+### 4.4 三线程协作完整数据流
+
+以一次完整的 Class A 上下行交互为例：
+
+```
+时间轴 ──────────────────────────────────────────────────────────►
+
+[SX1302 硬件]
+  t=3,784,146µs: 终端发来上行包，SX1302 接收完成
+
+[thread_up] (每10ms轮询)
+  t≈3,784,156µs: lgw_receive() 取出包
+                 CRC_OK → 通过过滤
+                 组装JSON: {"rxpk":[{"tmst":3784146,...}]}
                  send(sock_up, PUSH_DATA, ...)
-                 鈫撹摑鐏棯
-                 recv() 绛夊緟 ACK...
-                 鏀跺埌 PUSH_ACK 鈫?鈫撶豢鐏棯
+                 ↓蓝灯闪
+                 recv() 等待 ACK...
+                 收到 PUSH_ACK → ↓绿灯闪
 
-[NS 鏈嶅姟鍣╙
-  鏀跺埌 PUSH_DATA
-  璁＄畻 RX1: tmst = 3784146 + 1000000 = 4784146
-  鍙戦€?PULL_RESP: {"txpk":{"tmst":4784146,"freq":505.3,...}}
+[NS 服务器]
+  收到 PUSH_DATA
+  计算 RX1: tmst = 3784146 + 1000000 = 4784146
+  发送 PULL_RESP: {"txpk":{"tmst":4784146,"freq":505.3,...}}
 
-[thread_down] (涓€鐩村湪 recv 绛夊緟)
-  鏀跺埌 PULL_RESP
-  瑙ｆ瀽JSON 鈫?txpkt.count_us = 4784146
+[thread_down] (一直在 recv 等待)
+  收到 PULL_RESP
+  解析JSON → txpkt.count_us = 4784146
   jit_enqueue(&jit_queue[0], ..., CLASS_A)
-  send_tx_ack(JIT_ERROR_OK) 鈫?鈫撶豢鐏棯
+  send_tx_ack(JIT_ERROR_OK) → ↓绿灯闪
 
-[thread_jit] (姣?0ms妫€鏌?
-  t鈮?,783,156碌s: jit_peek() 鈫?鏃舵満宸插埌锛?                 jit_dequeue() 鈫?鍙栧嚭 txpkt
-                 lgw_status() 鈫?TX_FREE
+[thread_jit] (每10ms检查)
+  t≈4,783,156µs: jit_peek() → 时机已到！
+                 jit_dequeue() → 取出 txpkt
+                 lgw_status() → TX_FREE
                  lgw_send(&txpkt)
-                 鈫撶孩鐏棯
+                 ↓红灯闪
 
-[SX1302 纭欢]
-  t=4,784,146碌s: 绮剧‘鏃跺埢鍙戝皠涓嬭灏勯淇″彿
-  缁堢鑺傜偣 RX1 绐楀彛鎵撳紑 鈫?鎴愬姛鎺ユ敹涓嬭鍖?```
+[SX1302 硬件]
+  t=4,784,146µs: 精确时刻发射下行射频信号
+  终端节点 RX1 窗口打开 → 成功接收下行包
+```
 
-#### LED 涓夎壊鎸囩ず
+#### LED 三色指示
 
 ```c
-vUplinkFlash(10);   // thread_up: 涓婅鏈夊寘鍒拌揪  鈫?钃濈伅闂?vBackhaulFlash(10); // ACK 鏀跺埌锛堜笂琛?涓嬭锛?   鈫?缁跨伅闂?vDownlinkFlash(10); // thread_jit: 鍙戝皠鎴愬姛     鈫?绾㈢伅闂?```
+vUplinkFlash(10);   // thread_up: 上行有包到达  → 蓝灯闪
+vBackhaulFlash(10); // ACK 收到（上行/下行）    → 绿灯闪
+vDownlinkFlash(10); // thread_jit: 发射成功     → 红灯闪
+```
 
 ---
 
-## 闄勫綍A锛氭俯搴︿紶鎰熷櫒闂璇﹁В锛堣俯鍧戣褰曪級
+## 附录A：温度传感器问题详解（踩坑记录）
 
-### 闂鐜拌薄
+### 问题现象
 
-鍚姩鏃ュ織涓嚭鐜颁互涓嬭鍛婂拰閿欒锛?
+启动日志中出现以下警告和错误：
+
 ```
 WARNING: failed to configure temperature sensor on port 0x39
 WARNING: failed to configure temperature sensor on port 0x3B
@@ -918,162 +1089,190 @@ WARNING: failed to configure temperature sensor on port 0x38
 WARNING: no temperature sensor found.
 ```
 
-杩愯鏃舵瘡娆?`lgw_receive()` 閮芥墦鍗帮細
+运行时每次 `lgw_receive()` 都打印：
 
 ```
 ERROR: failed to read I2C device 0x38 (err=-1)
 ERROR: failed to get current temperature
 ```
 
-### 鏍瑰洜鍒嗘瀽
+### 根因分析
 
-#### 璋佸湪璇绘俯搴︼紵
+#### 谁在读温度？
 
-HAL 搴撲腑鏈変袱涓湴鏂硅鍙栨俯搴︼細
+HAL 库中有两个地方读取温度：
 
-1. **`lgw_receive()` 鍐呴儴**锛氭瘡娆′粠 SX1302 鍙栧寘鏃讹紝璋冪敤 `lgw_get_temperature()` 鑾峰彇褰撳墠娓╁害锛岀敤浜?RSSI 娓╁害琛ュ伩銆?*杩欏氨鏄瘡娆℃敹鍖呴兘鎵撳嵃閿欒鐨勫師鍥犮€?*
+1. **`lgw_receive()` 内部**：每次从 SX1302 取包时，调用 `lgw_get_temperature()` 获取当前温度，用于 RSSI 温度补偿。**这就是每次收包都打印错误的原因。**
 
-2. **涓诲惊鐜粺璁?*锛氭瘡 30 绉掕皟鐢ㄤ竴娆?`lgw_get_temperature()`锛岀敤浜庣姸鎬佹姤鍛婂拰 OLED 鏄剧ず銆?
-#### 娓╁害鐢ㄥ湪鍝紵
+2. **主循环统计**：每 30 秒调用一次 `lgw_get_temperature()`，用于状态报告和 OLED 显示。
+
+#### 温度用在哪？
 
 ```c
-// loragw_hal.c 涓?lgw_receive() 鐨勫鐞?res = lgw_get_temperature(&current_temperature);
+// loragw_hal.c 中 lgw_receive() 的处理
+res = lgw_get_temperature(&current_temperature);
 // ...
-// 鐢ㄦ俯搴﹀仛 RSSI 琛ュ伩
+// 用温度做 RSSI 补偿
 rssi_offset = sx1302_rssi_get_temperature_offset(&rssi_tcomp, current_temperature);
 // offset = a*T^4 + b*T^3 + c*T^2 + d*T + e
 ```
 
-杩欐槸瀵?SX1250 灏勯鍓嶇鎺ユ敹鍒扮殑 RSSI 鍊艰繘琛屾俯搴﹁ˉ鍋裤€備笉鍚屾俯搴︿笅 LNA锛堜綆鍣０鏀惧ぇ鍣級澧炵泭浼氭紓绉伙紝闇€瑕佺敤娓╁害绯绘暟澶氶」寮忔潵淇銆?
-#### 娓╁害浼犳劅鍣ㄦ槸鍝釜锛?
-HAL 鏈熸湜鐨勬槸 Semtech CoreCell 鍙傝€冭璁′笂鐨?*澶栭儴 I2C 娓╁害浼犳劅鍣?* STTS751锛圫T 鍗婂浣擄級锛屽湴鍧€ 0x39/0x3B/0x38銆傝繖棰楄姱鐗囨斁缃湪 SX1302 妯″潡闄勮繎锛屾祴閲忕殑鏄?RF 鑺墖鍛ㄥ洿鐨勭幆澧冩俯搴︺€?
+这是对 SX1250 射频前端接收到的 RSSI 值进行温度补偿。不同温度下 LNA（低噪声放大器）增益会漂移，需要用温度系数多项式来修正。
+
+#### 温度传感器是哪个？
+
+HAL 期望的是 Semtech CoreCell 参考设计上的**外部 I2C 温度传感器** STTS751（ST 半导体），地址 0x39/0x3B/0x38。这颗芯片放置在 SX1302 模块附近，测量的是 RF 芯片周围的环境温度。
+
 ```c
 // loragw_stts751.h
 static const uint8_t I2C_PORT_TEMP_SENSOR[] = {0x39, 0x3B, 0x38};
 ```
 
-#### 涓轰粈涔堟垜鐨勬澘瀛愭病鏈夛紵
+#### 为什么我的板子没有？
 
-鎴戜娇鐢ㄧ殑鏄幇鎴愮殑 SX1302 妯＄粍锛屾ā缁勫唴閮ㄦ湁 TCXO锛堟俯搴﹁ˉ鍋挎櫠鎸級浣?*娌℃湁鐒婃帴 STTS751 娓╁害浼犳劅鍣?*鈥斺€旇繖棰楄姱鐗囨槸 Semtech 鍙傝€冭璁＄殑涓€閮ㄥ垎锛屽苟闈?SX1302 鐨勫繀闇€缁勪欢銆?
-### TCXO 涓庢俯搴﹁ˉ鍋跨殑鍖哄埆
+我使用的是现成的 SX1302 模组，模组内部有 TCXO（温度补偿晶振）但**没有焊接 STTS751 温度传感器**——这颗芯片是 Semtech 参考设计的一部分，并非 SX1302 的必需组件。
 
-| 椤圭洰 | TCXO | RSSI 娓╁害琛ュ伩锛堜唬鐮佷腑鐨勶級 |
+### TCXO 与温度补偿的区别
+
+| 项目 | TCXO | RSSI 温度补偿（代码中的） |
 |---|---|---|
-| 琛ュ伩浠€涔?| 26MHz 鍙傝€冩椂閽熼鐜囨紓绉?| RSSI 璇绘暟闅忔俯搴︾殑鍋忕Щ |
-| 纭欢 | 妯＄粍鍐呯疆鐨勬俯琛ユ櫠鎸?| 澶栭儴 I2C 娓╁害浼犳劅鍣?STTS751) |
-| 鏄惁闇€瑕佷唬鐮佸弬涓?| 鍚︼紙绾‖浠惰嚜鍔ㄨˉ鍋匡級 | 鏄紙闇€瑕佽鍙栨俯搴﹁绠楄ˉ鍋块噺锛?|
-| 褰卞搷 | 棰戠巼绮惧害 | RSSI 绮惧害 |
+| 补偿什么 | 26MHz 参考时钟频率漂移 | RSSI 读数随温度的偏移 |
+| 硬件 | 模组内置的温补晶振 | 外部 I2C 温度传感器(STTS751) |
+| 是否需要代码参与 | 否（纯硬件自动补偿） | 是（需要读取温度计算补偿量） |
+| 影响 | 频率精度 | RSSI 精度 |
 
-### 瀹為檯褰卞搷
+### 实际影响
 
-**鍔熻兘涓嶅彈褰卞搷銆?* `lgw_get_temperature()` 澶辫触鏃讹紝HAL 浣跨敤榛樿娓╁害鍊硷紙涓婃鎴愬姛璇诲彇鐨勫€兼垨鍒濆鍊?25掳C锛夎绠楄ˉ鍋裤€傚浜庡鍐呭浐瀹氱綉鍏筹紝娓╁害鍙樺寲鑼冨洿涓嶅ぇ锛孯SSI 璇樊鍦ㄥ彲鎺ュ彈鑼冨洿鍐呫€?
-### 涓轰粈涔堜笉鑳界敤 ESP32-S3 鍐呯疆娓╁害浼犳劅鍣ㄤ唬鏇匡紵
+**功能不受影响。** `lgw_get_temperature()` 失败时，HAL 使用默认温度值（上次成功读取的值或初始值 25°C）计算补偿。对于室内固定网关，温度变化范围不大，RSSI 误差在可接受范围内。
 
-**涓嶈銆?* ESP32-S3 鍐呯疆 tsens 娴嬮噺鐨勬槸 MCU 鍐呮牳娓╁害锛屽湪 CPU 璐熻浇涓嬫瘮鐜娓╁害楂?10~30掳C銆傜敤 MCU 娓╁害鍘昏ˉ鍋?RF 鍓嶇鐨?RSSI锛屽弽鑰屼細寮曞叆鏇村ぇ鐨勭郴缁熻宸€?
-### 濡傛灉瑕佸交搴曡В鍐?
-鍦?SX1302 妯＄粍闄勮繎鐨?I2C 鎬荤嚎锛圫DA=GPIO4, SCL=GPIO5锛変笂鐒婃帴涓€棰楀吋瀹圭殑娓╁害浼犳劅鍣ㄨ姱鐗囷細
-- **STTS751**锛圫T 鍗婂浣擄紝HAL 鍘熺敓鏀寔锛?- **MCP9808**锛圡icrochip锛屽湴鍧€鍏煎锛?- **SE97B**锛圢XP锛屽湴鍧€鍏煎锛?
-SO8 灏佽锛屽嚑姣涢挶锛屾斁鍦ㄦā缁勬梺杈瑰嵆鍙€?
----
+### 为什么不能用 ESP32-S3 内置温度传感器代替？
 
-## 闄勫綍B锛氫簰鏂ラ噺浣跨敤姹囨€?
-```
-mx_concent (SPI 鎬荤嚎淇濇姢 鈥?鏈€閲嶈):
-    thread_up    鈫?lgw_receive()
-    thread_jit   鈫?lgw_get_instcnt() / lgw_status() / lgw_send()
-    thread_down  鈫?lgw_get_instcnt()锛堢敤浜?jit_enqueue 鑾峰彇褰撳墠鏃堕棿锛?    pkt_fwd_main 鈫?lgw_get_instcnt() / lgw_get_trigcnt() / lgw_get_temperature()
+**不行。** ESP32-S3 内置 tsens 测量的是 MCU 内核温度，在 CPU 负载下比环境温度高 10~30°C。用 MCU 温度去补偿 RF 前端的 RSSI，反而会引入更大的系统误差。
 
-mx_meas_up (涓婅缁熻):
-    thread_up    鈫?鍐欏叆 meas_nb_rx_* / meas_up_*
-    pkt_fwd_main 鈫?璇诲彇骞舵竻闆?
-mx_meas_dw (涓嬭缁熻):
-    thread_down  鈫?鍐欏叆 meas_dw_* / meas_nb_tx_requested
-    thread_jit   鈫?鍐欏叆 meas_nb_tx_ok / meas_nb_tx_fail / meas_nb_beacon_sent
-    pkt_fwd_main 鈫?璇诲彇骞舵竻闆?
-mx_stat_rep (鐘舵€佹姤鍛?:
-    pkt_fwd_main 鈫?鍐欏叆 status_report, 璁?report_ready=true
-    thread_up    鈫?璇诲彇 status_report, 娓?report_ready=false
+### 如果要彻底解决
 
-mx_xcorr (鏅舵尟鏍℃):
-    thread_valid 鈫?鍐欏叆 xtal_correct锛圙PS妯″紡涓嬶紝褰撳墠浠ｇ爜涓鐢級
-    thread_jit   鈫?璇诲彇 xtal_correct锛堢敤浜?Beacon 棰戠巼琛ュ伩锛?
-mx_timeref (GPS 鏃堕棿鍙傝€?:
-    thread_gps   鈫?鍐欏叆 time_reference_gps锛堝綋鍓嶇鐢級
-    thread_up    鈫?璇诲彇 local_ref锛堢敤浜?UTC 鏃堕棿鎴宠浆鎹級
-    thread_down  鈫?璇诲彇锛堢敤浜?Beacon 璋冨害鍜?GPS 鏃堕棿鍙戝皠锛?
-mx_meas_gps (GPS 鍧愭爣):
-    thread_gps   鈫?鍐欏叆 gps_coord_valid / meas_gps_coord
-    pkt_fwd_main 鈫?璇诲彇鐢ㄤ簬缁熻鏄剧ず
-```
+在 SX1302 模组附近的 I2C 总线（SDA=GPIO4, SCL=GPIO5）上焊接一颗兼容的温度传感器芯片：
+- **STTS751**（ST 半导体，HAL 原生支持）
+- **MCP9808**（Microchip，地址兼容）
+- **SE97B**（NXP，地址兼容）
+
+SO8 封装，几毛钱，放在模组旁边即可。
 
 ---
 
-## 闄勫綍C锛氬叧閿父閲忛€熸煡琛?
-| 甯搁噺 | 鍊?| 鍚箟 |
+## 附录B：互斥量使用汇总
+
+```
+mx_concent (SPI 总线保护 — 最重要):
+    thread_up    → lgw_receive()
+    thread_jit   → lgw_get_instcnt() / lgw_status() / lgw_send()
+    thread_down  → lgw_get_instcnt()（用于 jit_enqueue 获取当前时间）
+    pkt_fwd_main → lgw_get_instcnt() / lgw_get_trigcnt() / lgw_get_temperature()
+
+mx_meas_up (上行统计):
+    thread_up    → 写入 meas_nb_rx_* / meas_up_*
+    pkt_fwd_main → 读取并清零
+
+mx_meas_dw (下行统计):
+    thread_down  → 写入 meas_dw_* / meas_nb_tx_requested
+    thread_jit   → 写入 meas_nb_tx_ok / meas_nb_tx_fail / meas_nb_beacon_sent
+    pkt_fwd_main → 读取并清零
+
+mx_stat_rep (状态报告):
+    pkt_fwd_main → 写入 status_report, 设 report_ready=true
+    thread_up    → 读取 status_report, 清 report_ready=false
+
+mx_xcorr (晶振校正):
+    thread_valid → 写入 xtal_correct（GPS模式下，当前代码中禁用）
+    thread_jit   → 读取 xtal_correct（用于 Beacon 频率补偿）
+
+mx_timeref (GPS 时间参考):
+    thread_gps   → 写入 time_reference_gps（当前禁用）
+    thread_up    → 读取 local_ref（用于 UTC 时间戳转换）
+    thread_down  → 读取（用于 Beacon 调度和 GPS 时间发射）
+
+mx_meas_gps (GPS 坐标):
+    thread_gps   → 写入 gps_coord_valid / meas_gps_coord
+    pkt_fwd_main → 读取用于统计显示
+```
+
+---
+
+## 附录C：关键常量速查表
+
+| 常量 | 值 | 含义 |
 |---|---|---|
-| `PROTOCOL_VERSION` | 2 | Semtech 鍗忚 v1.6 |
-| `NB_PKT_MAX` | 24 | 姣忔 lgw_receive 鏈€澶氬彇鐨勫寘鏁?|
-| `FETCH_SLEEP_MS` | 10 | 鏃犲寘鏃剁殑杞闂撮殧(ms) |
-| `PUSH_TIMEOUT_MS` | 500 | PUSH_ACK 鎬荤瓑寰呮椂闂?ms) |
-| `PULL_TIMEOUT_MS` | 400 | PULL_ACK 鍗曟 recv 瓒呮椂(ms) |
-| `DEFAULT_KEEPALIVE` | 5 | PULL_DATA 鍙戦€侀棿闅?s) |
-| `DEFAULT_STAT` | 30 | 缁熻鎶ュ憡闂撮殧(s) |
-| `WIFI_MAXIMUM_RETRY` | 5 | WiFi 杩炴帴鏈€澶ч噸璇曟鏁?|
-| `TX_BUFF_SIZE` | ~13230 | 涓婅 UDP 缂撳啿鍖哄ぇ灏?|
-| `PKT_PUSH_DATA` | 0 | 涓婅鏁版嵁鍖呯被鍨?|
-| `PKT_PUSH_ACK` | 1 | 涓婅纭鍖呯被鍨?|
-| `PKT_PULL_DATA` | 2 | 涓嬭鎷夊彇璇锋眰绫诲瀷 |
-| `PKT_PULL_RESP` | 3 | 涓嬭鏁版嵁鍝嶅簲绫诲瀷 |
-| `PKT_PULL_ACK` | 4 | 涓嬭鎷夊彇纭绫诲瀷 |
-| `PKT_TX_ACK` | 5 | 鍙戝皠纭鍖呯被鍨?|
+| `PROTOCOL_VERSION` | 2 | Semtech 协议 v1.6 |
+| `NB_PKT_MAX` | 24 | 每次 lgw_receive 最多取的包数 |
+| `FETCH_SLEEP_MS` | 10 | 无包时的轮询间隔(ms) |
+| `PUSH_TIMEOUT_MS` | 500 | PUSH_ACK 总等待时间(ms) |
+| `PULL_TIMEOUT_MS` | 400 | PULL_ACK 单次 recv 超时(ms) |
+| `DEFAULT_KEEPALIVE` | 5 | PULL_DATA 发送间隔(s) |
+| `DEFAULT_STAT` | 30 | 统计报告间隔(s) |
+| `WIFI_MAXIMUM_RETRY` | 5 | WiFi 连接最大重试次数 |
+| `TX_BUFF_SIZE` | ~13230 | 上行 UDP 缓冲区大小 |
+| `PKT_PUSH_DATA` | 0 | 上行数据包类型 |
+| `PKT_PUSH_ACK` | 1 | 上行确认包类型 |
+| `PKT_PULL_DATA` | 2 | 下行拉取请求类型 |
+| `PKT_PULL_RESP` | 3 | 下行数据响应类型 |
+| `PKT_PULL_ACK` | 4 | 下行拉取确认类型 |
+| `PKT_TX_ACK` | 5 | 发射确认包类型 |
 
 ---
 
-## 闄勫綍D锛氱‖浠跺紩鑴氭槧灏?
-鏂囦欢: `main/board_config.h`
+## 附录D：硬件引脚映射
 
-| 鍔熻兘 | GPIO | 璇存槑 |
+文件: `main/board_config.h`
+
+| 功能 | GPIO | 说明 |
 |---|---|---|
-| SPI MISO | 13 | SX1302 鏁版嵁杈撳嚭 |
-| SPI MOSI | 11 | SX1302 鏁版嵁杈撳叆 |
-| SPI CLK | 12 | SPI 鏃堕挓 |
-| SPI CS | 14 | SX1302 鐗囬€?|
-| SX1302 RESET | 2 | 纭欢澶嶄綅锛堜綆鏈夋晥锛?|
-| I2C SDA | 4 | OLED / 娓╁害浼犳劅鍣?|
-| I2C SCL | 5 | OLED / 娓╁害浼犳劅鍣?|
-| 蹇冭烦 LED | 1 | 鍚姩瀹屾垚鍚庣唲鐏?|
-| 钃濊壊 LED | 33 | 涓婅鍖呮寚绀?|
-| 缁胯壊 LED | 7 | 鍥炰紶閫氫俊鎸囩ず |
-| 绾㈣壊 LED | 27 | 涓嬭鍙戝皠鎸囩ず |
-| 鐢ㄦ埛鎸夐挳1 | 0 | IO0锛屽己鍒惰繘 Soft-AP |
-| 鐢ㄦ埛鎸夐挳2 | 6 | IO6锛岄鐣?|
+| SPI MISO | 13 | SX1302 数据输出 |
+| SPI MOSI | 11 | SX1302 数据输入 |
+| SPI CLK | 12 | SPI 时钟 |
+| SPI CS | 14 | SX1302 片选 |
+| SX1302 RESET | 2 | 硬件复位（低有效） |
+| I2C SDA | 4 | OLED / 温度传感器 |
+| I2C SCL | 5 | OLED / 温度传感器 |
+| 心跳 LED | 1 | 启动完成后熄灭 |
+| 蓝色 LED | 33 | 上行包指示 |
+| 绿色 LED | 7 | 回传通信指示 |
+| 红色 LED | 27 | 下行发射指示 |
+| 用户按钮1 | 0 | IO0，强制进 Soft-AP |
+| 用户按钮2 | 6 | IO6，预留 |
 
 ---
 
-## 闄勫綍E锛氳繍琛屾椂鏃ュ織瑙ｈ鍙傝€?
-浠ヤ笅鏄竴娈靛疄闄呰繍琛屾棩蹇楃殑鍏抽敭閮ㄥ垎娉ㄩ噴锛?
-```
-*** ESXP1302 Gateway. Version: 1.0.6 ***        鈫?鍥轰欢鐗堟湰
+## 附录E：运行时日志解读参考
 
-wifi_ssid: 304                                    鈫?NVS 璇诲彇鐨勯厤缃?ns_host: 192.168.71.108
+以下是一段实际运行日志的关键部分注释：
+
+```
+*** ESXP1302 Gateway. Version: 1.0.6 ***        ← 固件版本
+
+wifi_ssid: 304                                    ← NVS 读取的配置
+ns_host: 192.168.71.108
 ns_port: 1700
 gw_id: AA555A00000021FB
 freq_region: cn470
-freq_radio0: 486600000                            鈫?Radio0 涓績棰戠巼 486.6MHz
-freq_radio1: 487400000                            鈫?Radio1 涓績棰戠巼 487.4MHz
+freq_radio0: 486600000                            ← Radio0 中心频率 486.6MHz
+freq_radio1: 487400000                            ← Radio1 中心频率 487.4MHz
 
-INFO: concentrator started                        鈫?SX1302 鍚姩鎴愬姛
+INFO: concentrator started                        ← SX1302 启动成功
 
-WARNING: no temperature sensor found.             鈫?姝ｅ父锛屾病鏈夊閮?STTS751
+WARNING: no temperature sensor found.             ← 正常，没有外部 STTS751
 
-INFO: Received pkt from mote: 6F6C6C65 (fcnt=28535) 鈫?鏀跺埌缁堢涓婅鍖?JSON up: {"rxpk":[{..., "data":"aGVsbG8gd29ybGQ="}]} 鈫?Base64 = "hello world"
-INFO: [up] PUSH_ACK received in 2 ms             鈫?NS 纭鏀跺埌
+INFO: Received pkt from mote: 6F6C6C65 (fcnt=28535) ← 收到终端上行包
+JSON up: {"rxpk":[{..., "data":"aGVsbG8gd29ybGQ="}]} ← Base64 = "hello world"
+INFO: [up] PUSH_ACK received in 2 ms             ← NS 确认收到
 
-INFO: [down] PULL_ACK received in 143 ms          鈫?NS 瀛樻椿纭
+INFO: [down] PULL_ACK received in 143 ms          ← NS 存活确认
 
-ERROR: failed to get current temperature          鈫?娓╁害璇诲彇澶辫触锛堣闄勫綍A锛?### Concentrator temperature unknown ###           鈫?娓╁害涓嶅彲鐢紝涓嶅奖鍝嶅姛鑳?
-##### 2026-02-22 01:23:45 UTC #####               鈫?30绉掔粺璁℃姤鍛?# RF packets received: 3
+ERROR: failed to get current temperature          ← 温度读取失败（见附录A）
+### Concentrator temperature unknown ###           ← 温度不可用，不影响功能
+
+##### 2026-02-22 01:23:45 UTC #####               ← 30秒统计报告
+# RF packets received: 3
 # CRC_OK: 100.00%
-# PUSH_DATA acknowledged: 100.00%                鈫?鎵€鏈変笂琛屽寘 NS 閮界‘璁や簡
-# PULL_DATA sent: 3 (100.00% acknowledged)        鈫?涓?NS 閫氫俊姝ｅ父
+# PUSH_DATA acknowledged: 100.00%                ← 所有上行包 NS 都确认了
+# PULL_DATA sent: 3 (100.00% acknowledged)        ← 与 NS 通信正常
 ```

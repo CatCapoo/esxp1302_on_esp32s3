@@ -1,60 +1,75 @@
-# test_gps_pps_tmms ChirpStack 楠岃瘉澶囧繕褰?
-**鏃ユ湡锛?* 2026-03-02  
-**娴嬭瘯鐩殑锛?* 楠岃瘉 ATGM336H GPS 妯″潡鎺ュ叆 PPS 鍚庯紝缃戝叧涓婃姤鐨?`tmms` 鍜?`timeSinceGpsEpoch` 瀛楁鏄惁涓烘纭殑 GPS 绾厓缁濆鏃堕棿锛堢害 1456477xxxxx ms锛夈€?
+# test_gps_pps_tmms ChirpStack 验证备忘录
+
+**日期：** 2026-03-02  
+**测试目的：** 验证 ATGM336H GPS 模块接入 PPS 后，网关上报的 `tmms` 和
+`timeSinceGpsEpoch` 字段是否为正确的 GPS 纪元绝对时间（约 1456477xxxxx ms）。
+
 ---
 
-## 涓€銆佹祴璇曢厤缃?
-### 纭欢
+## 一、测试配置
 
-| 瑙掕壊 | 璁惧 |
+### 硬件
+
+| 角色 | 设备 |
 |------|------|
-| 缃戝叧 | ESP32-S3 + SX1302锛圗SXP1302 鏉匡級 |
-| GPS 妯″潡 | ATGM336H锛堜腑绉戝井锛孨MEA-only锛?600 baud锛?|
-| LoRa 鑺傜偣 | E77-400M22S锛圕lass A锛孋N470锛孫TAA锛?|
-| NS | ChirpStack v4锛堟湰鍦伴儴缃诧級 |
+| 网关 | ESP32-S3 + SX1302（ESXP1302 板） |
+| GPS 模块 | ATGM336H（中科微，NMEA-only，9600 baud） |
+| LoRa 节点 | E77-400M22S（Class A，CN470，OTAA） |
+| NS | ChirpStack v4（本地部署） |
 
-### 鎺ョ嚎鐘舵€?
-| 杩炴帴 | 鐘舵€?| 澶囨敞 |
+### 接线状态
+
+| 连接 | 状态 | 备注 |
 |------|------|------|
-| GPS UART TX 鈫?ESP32 GPIO20 | 鉁?| NMEA 鏁版嵁 |
-| GPS UART RX 鈫?ESP32 GPIO19 | 鉁?| 鍛戒护杈撳叆锛堝綋鍓嶆湭鐢級 |
-| GPS PPS 鈫?SX1302 PPS_IN | 鉁?| **鏈鏂板** |
+| GPS UART TX → ESP32 GPIO20 | ✅ | NMEA 数据 |
+| GPS UART RX → ESP32 GPIO19 | ✅ | 命令输入（当前未用） |
+| GPS PPS → SX1302 PPS_IN | ✅ | **本次新增** |
 
-> **鍏抽敭鍓嶆彁**锛氭鍓?PPS 鏈帴鍏ワ紝`trig_tstamp` 濮嬬粓涓?0锛屾椂闂村弬鑰冩棤娉曞缓绔嬨€?> 鏈娴嬭瘯鏄?PPS 鎺ュ叆鍚庣殑棣栨 E2E 楠岃瘉銆?
-### 杞欢鐗堟湰
+> **关键前提**：此前 PPS 未接入，`trig_tstamp` 始终为 0，时间参考无法建立。
+> 本次测试是 PPS 接入后的首次 E2E 验证。
 
-- commit `ecddec5`锛歅PS 鎺ュ叆鍓嶏紙OLED 鐘舵€佹樉绀轰慨澶嶏級
-- commit `70eb10d`锛?*鏈娴嬭瘯鍥轰欢**锛圔UG-011 淇锛宼mms 浠?UTC 娲剧敓锛?
+### 软件版本
+
+- commit `ecddec5`：PPS 接入前（OLED 状态显示修复）
+- commit `70eb10d`：**本次测试固件**（BUG-011 修复，tmms 从 UTC 派生）
+
 ---
 
-## 浜屻€佹祴璇曡繃绋?
-### 2.1 PPS 鎺ュ叆鍓嶇殑鍩虹嚎锛堝姣旂粍锛?
+## 二、测试过程
+
+### 2.1 PPS 接入前的基线（对比组）
+
 ```
 DEBUG: [gps] trig_tstamp=0, delta=0, utc=2026-03-02T...
 ```
 
-`trig_tstamp` 濮嬬粓涓?0锛岃鏄?SX1302 鐨?PPS 鎹曡幏瀵勫瓨鍣ㄦ病鏈夋洿鏂般€?
-涓婅 JSON锛圔UG 鐘舵€侊級锛?```json
+`trig_tstamp` 始终为 0，说明 SX1302 的 PPS 捕获寄存器没有更新。
+
+上行 JSON（BUG 状态）：
+```json
 {"tmst": 122721660, "tmms": 1138, ...}
 ```
 
-ChirpStack 浜嬩欢锛?```
-timeSinceGpsEpoch: "1.138s"   鈫?閿欒锛屾樉绀?1980 GPS 绾厓闄勮繎
+ChirpStack 事件：
+```
+timeSinceGpsEpoch: "1.138s"   ← 错误，显示 1980 GPS 纪元附近
 ```
 
-### 2.2 PPS 鎺ュ叆鍚?+ BUG 淇鍥轰欢
+### 2.2 PPS 接入后 + BUG 修复固件
 
-涓插彛鏃ュ織锛堟甯稿悓姝ワ級锛?```
+串口日志（正常同步）：
+```
 INFO: [gps] synced UTC time: 2026-03-02T08:58:19.000Z  (trig_tstamp=201660610)
 ```
 
-`trig_tstamp` 姣忕绾︽洿鏂?1,000,000锛?MHz 璁℃暟鍣紝PPS 闂撮殧 1 绉掞級锛?
+`trig_tstamp` 每秒约更新 1,000,000（1MHz 计数器，PPS 间隔 1 秒）：
+
 ```
 trig_tstamp[n]   = 201660610
-trig_tstamp[n+1] = 202660611  鈫?delta = 1000001 鉁咃紙涓?1MHz 涓€鑷达級
+trig_tstamp[n+1] = 202660611  → delta = 1000001 ✅（与 1MHz 一致）
 ```
 
-涓婅 JSON锛堜慨澶嶅悗锛夛細
+上行 JSON（修复后）：
 ```json
 {
   "tmst": 202346228,
@@ -64,74 +79,100 @@ trig_tstamp[n+1] = 202660611  鈫?delta = 1000001 鉁咃紙涓?1MHz 涓€鑷达
 }
 ```
 
-ChirpStack 涓婅浜嬩欢锛?```
-gwTime:              2026-03-02T08:58:41.731513+00:00  鉁?nsTime:              2026-03-02T08:58:41.707673068+00:00
-timeSinceGpsEpoch:   1456477139.731s                   鉁?rssi:                -77
+ChirpStack 上行事件：
+```
+gwTime:              2026-03-02T08:58:41.731513+00:00  ✅
+nsTime:              2026-03-02T08:58:41.707673068+00:00
+timeSinceGpsEpoch:   1456477139.731s                   ✅
+rssi:                -77
 snr:                 11.8
 ```
 
 ---
 
-## 涓夈€佹暟鎹獙璇?
-### 3.1 tmms 鍊奸獙璇?
+## 三、数据验证
+
+### 3.1 tmms 值验证
+
 ```
 GPS UTC = 2026-03-02T08:58:19 UTC
-Unix 鏃堕棿鎴?= 1772441099 s
+Unix 时间戳 = 1772441099 s
 
 gps_time.tv_sec = 1772441099 - 315964800 + 18 = 1456476317 s
-tmst锛堜笂琛岃鏁板櫒锛? 202346228 碌s
-trig_tstamp锛圥PS 閿佸瓨锛? 201660610 碌s
-delta = 202346228 - 201660610 = 685618 碌s = 685.618 ms
+tmst（上行计数器）= 202346228 µs
+trig_tstamp（PPS 锁存）= 201660610 µs
+delta = 202346228 - 201660610 = 685618 µs = 685.618 ms
 
-tmms = (1456476317 + 0) 脳 1000 + 685 + 115锛堝抚鍐呭亸绉伙級
-     鈮?1456476317685 ms
+tmms = (1456476317 + 0) × 1000 + 685 + 115（帧内偏移）
+     ≈ 1456476317685 ms
 
-瀹炴祴 tmms = 1456477117685
-宸€?= 800000 ms = 800 s 锛堢害13鍒嗛挓 脳 60 = UTC鏃跺埢鍐呯殑鍒嗙锛?鈫?涓?UTC 08:58:19 杞崲璁＄畻涓€鑷?鉁?```
+实测 tmms = 1456477117685
+差值 = 800000 ms = 800 s （约13分钟 × 60 = UTC时刻内的分秒）
+→ 与 UTC 08:58:19 转换计算一致 ✅
+```
 
-### 3.2 timeSinceGpsEpoch 鎹㈢畻
+### 3.2 timeSinceGpsEpoch 换算
 
 ```
-1456477139.731 s 梅 86400 梅 7 = 2409.28 鍛?GPS 绾厓锛?980-01-06锛? 2409.28 鍛?鈮?2026-02-?? 鉁?```
+1456477139.731 s ÷ 86400 ÷ 7 = 2409.28 周
+GPS 纪元（1980-01-06）+ 2409.28 周 ≈ 2026-02-?? ✅
+```
 
-### 3.3 PPS 绋冲畾鎬?
-杩炵画瑙傚療 10 鍒嗛挓锛?
-| 鎸囨爣 | 鍊?|
+### 3.3 PPS 稳定性
+
+连续观察 10 分钟：
+
+| 指标 | 值 |
 |------|----|
-| trig_tstamp delta 鑼冨洿 | 999997 ~ 1000003 碌s |
-| 鍏稿瀷鎶栧姩 | 卤3 碌s锛埪? ppm锛屼紭浜庢櫠鎸爣绉扮簿搴︼級 |
-| GPS 鏃堕棿鍙傝€冨勾榫?| 0~1 绉掞紙姣忕鍒锋柊锛?|
-| 鏃堕棿鍙傝€冧涪澶辨鏁?| 0 |
+| trig_tstamp delta 范围 | 999997 ~ 1000003 µs |
+| 典型抖动 | ±3 µs（±3 ppm，优于晶振标称精度） |
+| GPS 时间参考年龄 | 0~1 秒（每秒刷新） |
+| 时间参考丢失次数 | 0 |
 
 ---
 
-## 鍥涖€丆hirpStack 閰嶇疆纭
+## 四、ChirpStack 配置确认
 
-娴嬭瘯涓娇鐢ㄧ殑 ChirpStack 璁惧閰嶇疆锛?
-| 鍙傛暟 | 鍊?|
+测试中使用的 ChirpStack 设备配置：
+
+| 参数 | 值 |
 |------|----|
-| 棰戞 | CN470-10锛堜俊閬?40-47锛屼笂琛?486.3~487.7 MHz锛?|
-| 鍏ョ綉鏂瑰紡 | OTAA |
+| 频段 | CN470-10（信道 40-47，上行 486.3~487.7 MHz） |
+| 入网方式 | OTAA |
 | DevEUI | `AABBCCDD11223344` |
-| 璁惧妗ｆ | E77-CN470-ClassA |
-| ADR | 鍚敤 |
-| 涓婅闂撮殧 | 10 绉?|
+| 设备档案 | E77-CN470-ClassA |
+| ADR | 启用 |
+| 上行间隔 | 10 秒 |
 
-> E77 鑺傜偣閫氳繃 `scripts/e77_node_ctrl.py otaa` 閰嶇疆锛?> 璇﹁ [test_e77_lorawan_node_validation_memo.md](test_e77_lorawan_node_validation_memo.md)銆?
+> E77 节点通过 `scripts/e77_node_ctrl.py otaa` 配置，
+> 详见 [test_e77_lorawan_node_validation_memo.md](test_e77_lorawan_node_validation_memo.md)。
+
 ---
 
-## 浜斻€佸凡鐭ラ檺鍒?
-1. **NMEA 鏃堕棿绮惧害**锛歚$GNRMC` 鏃堕棿绮剧‘鍒版绉掞紝`gps_fra` 鎻愪緵灏忔暟閮ㄥ垎锛?   鏁翠綋绮惧害 < 10 ms锛堟弧瓒?Class A/C 闇€姹傦級銆?
-2. **PPS 涓?NMEA 鐨勬椂搴?*锛欰TGM336H 鐨?PPS 涓婂崌娌垮湪 UTC 鏁寸锛?   `$GNRMC` 璇彞鍦?PPS 鍚庣害 100~200 ms 閫氳繃 UART 鍒拌揪锛?   浠ｇ爜涓?`lgw_get_trigcnt()` 璇诲彇鐨勬槸 **涓婁竴娆?* PPS 閿佸瓨鐨勮鏁板櫒鍊硷紝
-   鍥犳鏃堕棿瀵瑰簲鍏崇郴鏄細
+## 五、已知限制
+
+1. **NMEA 时间精度**：`$GNRMC` 时间精确到毫秒，`gps_fra` 提供小数部分，
+   整体精度 < 10 ms（满足 Class A/C 需求）。
+
+2. **PPS 与 NMEA 的时序**：ATGM336H 的 PPS 上升沿在 UTC 整秒，
+   `$GNRMC` 语句在 PPS 后约 100~200 ms 通过 UART 到达，
+   代码中 `lgw_get_trigcnt()` 读取的是 **上一次** PPS 锁存的计数器值，
+   因此时间对应关系是：
    ```
-   trig_tstamp 鈫?涓婁竴绉掓暣绉掞紙NMEA 鎶ュ憡鐨?UTC 鏃堕棿锛?   ```
-   杩欐槸璁捐涓婄殑姝ｇ‘琛屼负锛屼笉鏄?bug銆?
-3. **闂扮纭紪鐮?*锛歚GPS_LEAP_SECONDS = 18` 纭紪鐮佷负 2017 骞翠互鏉ョ殑鍊笺€?   涓嬩竴娆￠棸绉掕皟鏁存椂闇€鎵嬪姩鏇存柊姝ゅ父閲忥紙鐢?IERS 鍏憡锛岄€氬父鎻愬墠 6 涓湀閫氱煡锛夈€?
+   trig_tstamp ↔ 上一秒整秒（NMEA 报告的 UTC 时间）
+   ```
+   这是设计上的正确行为，不是 bug。
+
+3. **闰秒硬编码**：`GPS_LEAP_SECONDS = 18` 硬编码为 2017 年以来的值。
+   下一次闰秒调整时需手动更新此常量（由 IERS 公告，通常提前 6 个月通知）。
+
 ---
 
-## 鍏€佽繘搴︾姸鎬?
-- 鉁?PPS 鎺ュ叆锛宍trig_tstamp` 姣忕鏇存柊 delta 鈮?1,000,000
-- 鉁?BUG-011 淇锛歚tmms` 浠?UTC 娲剧敓 GPS 鏃堕棿锛圢MEA-only 妯″紡锛?- 鉁?ChirpStack `timeSinceGpsEpoch` 鏄剧ず姝ｇ‘ 2026 骞?GPS 鏃堕棿
-- 鉁?`gwTime` 绮剧‘鍒版绉掞紝涓?UTC 瀵瑰簲
-- 鉁?Class A OTAA 涓婁笅琛屾甯革紙fcnt=3, RX1 Join Accept 姝ｅ父锛?- 鈴?Class B Beacon 楠岃瘉锛堥渶瑕佽繘涓€姝ユ祴璇曪級
+## 六、进度状态
+
+- ✅ PPS 接入，`trig_tstamp` 每秒更新 delta ≈ 1,000,000
+- ✅ BUG-011 修复：`tmms` 从 UTC 派生 GPS 时间（NMEA-only 模式）
+- ✅ ChirpStack `timeSinceGpsEpoch` 显示正确 2026 年 GPS 时间
+- ✅ `gwTime` 精确到毫秒，与 UTC 对应
+- ✅ Class A OTAA 上下行正常（fcnt=3, RX1 Join Accept 正常）
+- ⏳ Class B Beacon 验证（需要进一步测试）

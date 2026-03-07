@@ -1,146 +1,195 @@
-# LoRaWAN 缃戝叧涓?Network Server 鍗忚瑙勫畾
+# LoRaWAN 网关与 Network Server 协议规定
 
-> 鍐欎綔鑳屾櫙锛?026-02-22 璋冭瘯 ESXP1302 鎺ュ叆 ChirpStack锛?> 娣卞叆鐞嗚В浜?Semtech UDP 鍖呰浆鍙戝崗璁€丟ateway Bridge 鐨勪綔鐢ㄥ拰 MQTT 璇濋瑙勮寖銆?
+> 写作背景：2026-02-22 调试 ESXP1302 接入 ChirpStack，
+> 深入理解了 Semtech UDP 包转发协议、Gateway Bridge 的作用和 MQTT 话题规范。
+
 ---
 
-## 涓€銆丩oRaWAN 缃戠粶鏋舵瀯鎬昏
+## 一、LoRaWAN 网络架构总览
 
-LoRaWAN 閲囩敤鏄熷舰鎷撴墤锛岀敱鍥涘眰缁勬垚锛?
+LoRaWAN 采用星形拓扑，由四层组成：
+
 ```
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?  LoRa RF    鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?  UDP/IP   鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?  MQTT   鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?End Node 鈹?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 鈹?Gateway  鈹?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 鈹?Gateway Bridge  鈹?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 鈹?Network Server 鈹?鈹傦紙鑺傜偣锛? 鈹?             鈹傦紙缃戝叧锛? 鈹?1700/1680  鈹傦紙鍗忚杞崲锛?    鈹?         鈹傦紙NS锛孋hirpStack锛夆攤
-鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?             鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?            鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?         鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+┌──────────┐   LoRa RF    ┌──────────┐   UDP/IP   ┌─────────────────┐   MQTT   ┌────────────────┐
+│ End Node │ ──────────── │ Gateway  │ ─────────── │ Gateway Bridge  │ ──────── │ Network Server │
+│（节点）  │              │（网关）  │ 1700/1680  │（协议转换）     │          │（NS，ChirpStack）│
+└──────────┘              └──────────┘             └─────────────────┘          └────────────────┘
+```
 
-姣忓眰鑱岃矗锛?
-| 灞?| 鑱岃矗 |
+每层职责：
+
+| 层 | 职责 |
 |----|------|
-| **End Node** | 浼犳劅鍣?鎵ц鍣紝閫氳繃 LoRa 鍙戦€佹暟鎹紝瀹炵幇 ClassA/B/C |
-| **Gateway** | 绾墿鐞嗗眰杞彂锛屾敹 LoRa 鍖呪啋灏?UDP锛屼笉瑙ｅ瘑銆佷笉鍒ゆ柇鐪熷亣 |
-| **Gateway Bridge** | 灏?Semtech UDP 鍗忚杞崲涓?MQTT锛屼袱绔兘鍙互閰嶇疆 |
-| **Network Server** | 瑙ｅ瘑銆佸幓閲嶃€丄DR銆佷笅琛岃皟搴︺€佽澶囬壌鏉?|
-| **Application Server** | 澶勭悊涓氬姟鏁版嵁锛孨S 閫氳繃 gRPC/HTTP 瀵规帴 |
+| **End Node** | 传感器/执行器，通过 LoRa 发送数据，实现 ClassA/B/C |
+| **Gateway** | 纯物理层转发，收 LoRa 包→封 UDP，不解密、不判断真假 |
+| **Gateway Bridge** | 将 Semtech UDP 协议转换为 MQTT，两端都可以配置 |
+| **Network Server** | 解密、去重、ADR、下行调度、设备鉴权 |
+| **Application Server** | 处理业务数据，NS 通过 gRPC/HTTP 对接 |
 
 ---
 
-## 浜屻€丼emtech UDP 鍖呰浆鍙戝崗璁紙Semtech Packet Forwarder Protocol锛?
-鏈崗璁槸缃戝叧鍜?Gateway Bridge/NS 涔嬮棿鐨勬爣鍑嗗崗璁紝
-鐢?Semtech 璁捐骞跺紑婧愶紙basic_pkt_fwd銆乴ora_pkt_fwd锛夛紝
-LoRaWAN 鐢熸€佷腑鍑犱箮鎵€鏈夌綉鍏抽兘鏀寔銆?
-### 2.1 UDP 绔彛绾﹀畾
+## 二、Semtech UDP 包转发协议（Semtech Packet Forwarder Protocol）
 
-| 鏂瑰悜 | 绔彛 | 璇存槑 |
+本协议是网关和 Gateway Bridge/NS 之间的标准协议，
+由 Semtech 设计并开源（basic_pkt_fwd、lora_pkt_fwd），
+LoRaWAN 生态中几乎所有网关都支持。
+
+### 2.1 UDP 端口约定
+
+| 方向 | 端口 | 说明 |
 |------|------|------|
-| 缃戝叧 鈫?NS锛堝彂閫佹柟锛?| 闅忔満锛堟湰鍦扮鍙ｏ級| 鍔ㄦ€佸垎閰?|
-| NS 鈫?缃戝叧锛堟帴鏀舵柟锛屼笂琛岀鍙ｏ級 | **1700**锛堥粯璁わ級| 鎺ユ敹 PUSH_DATA |
-| NS 鈫?缃戝叧锛堟帴鏀舵柟锛屼笅琛岀鍙ｏ級 | **1700**锛堥粯璁わ級| 鎺ユ敹 PULL_RESP |
-| 缃戝叧鏈湴锛堟帴鏀?PULL_RESP锛墊 **1680**锛堥粯璁わ級| 閮ㄥ垎瀹炵幇鐢ㄤ笉鍚岀鍙?|
+| 网关 → NS（发送方） | 随机（本地端口）| 动态分配 |
+| NS → 网关（接收方，上行端口） | **1700**（默认）| 接收 PUSH_DATA |
+| NS → 网关（接收方，下行端口） | **1700**（默认）| 接收 PULL_RESP |
+| 网关本地（接收 PULL_RESP）| **1680**（默认）| 部分实现用不同端口 |
 
-> 鏈」鐩厤缃細serv_port_up=1680锛宻erv_port_down=1680锛堣 global_conf.json锛?
-### 2.2 浜旂娑堟伅绫诲瀷
+> 本项目配置：serv_port_up=1680，serv_port_down=1680（见 global_conf.json）
 
-#### PUSH_DATA锛堢綉鍏?鈫?NS锛屼笂琛屾暟鎹級
+### 2.2 五种消息类型
 
-缃戝叧鏀跺埌 LoRa 鍖呭悗锛屾墦鍖呮垚 JSON 閫氳繃 UDP 鍙戠粰 NS锛?
+#### PUSH_DATA（网关 → NS，上行数据）
+
+网关收到 LoRa 包后，打包成 JSON 通过 UDP 发给 NS：
+
 ```
-瀛楄妭0锛氬崗璁増鏈紙0x02锛?瀛楄妭1-2锛氶殢鏈?token锛?瀛楄妭锛岀敤浜庡尮閰?ACK锛?瀛楄妭3锛氭秷鎭被鍨?0x00 = PUSH_DATA
-瀛楄妭4-11锛氱綉鍏?EUI锛?瀛楄妭锛屽ぇ绔級
-瀛楄妭12+锛欽SON 瀛楃涓诧紙rxpk 鏁扮粍锛?```
+字节0：协议版本（0x02）
+字节1-2：随机 token（2字节，用于匹配 ACK）
+字节3：消息类型 0x00 = PUSH_DATA
+字节4-11：网关 EUI（8字节，大端）
+字节12+：JSON 字符串（rxpk 数组）
+```
 
-JSON 绀轰緥锛?```json
+JSON 示例：
+```json
 {
   "rxpk": [{
-    "tmst": 12345678,     // 缃戝叧鏈湴鏃堕棿鎴筹紙寰锛?2浣嶅惊鐜級
-    "freq": 486.7,        // 鎺ユ敹棰戠巼锛圡Hz锛?    "chan": 2,            // 淇￠亾缂栧彿锛圛F0~IF7锛?    "rfch": 0,            // radio 缂栧彿锛?鎴?锛?    "stat": 1,            // CRC 鐘舵€侊紙1=OK, -1=FAIL, 0=NO_CRC锛?    "modu": "LORA",       // 璋冨埗鏂瑰紡
-    "datr": "SF12BW125",  // 鏁版嵁鐜囷紙SFxBWyyy锛?    "codr": "4/5",        // 缂栫爜鐜?    "rssi": -73,          // RSSI锛坉Bm锛?    "lsnr": 4.0,          // SNR锛坉B锛?    "size": 11,           // payload 瀛楄妭鏁?    "data": "aGVsbG8="   // Base64 缂栫爜鐨?payload
+    "tmst": 12345678,     // 网关本地时间戳（微秒，32位循环）
+    "freq": 486.7,        // 接收频率（MHz）
+    "chan": 2,            // 信道编号（IF0~IF7）
+    "rfch": 0,            // radio 编号（0或1）
+    "stat": 1,            // CRC 状态（1=OK, -1=FAIL, 0=NO_CRC）
+    "modu": "LORA",       // 调制方式
+    "datr": "SF12BW125",  // 数据率（SFxBWyyy）
+    "codr": "4/5",        // 编码率
+    "rssi": -73,          // RSSI（dBm）
+    "lsnr": 4.0,          // SNR（dB）
+    "size": 11,           // payload 字节数
+    "data": "aGVsbG8="   // Base64 编码的 payload
   }]
 }
 ```
 
-#### PUSH_ACK锛圢S 鈫?缃戝叧锛岀‘璁ゆ敹鍒颁笂琛岋級
+#### PUSH_ACK（NS → 网关，确认收到上行）
 
 ```
-瀛楄妭0锛?x02
-瀛楄妭1-2锛氫笌 PUSH_DATA 鐩稿悓鐨?token
-瀛楄妭3锛?x01 = PUSH_ACK
+字节0：0x02
+字节1-2：与 PUSH_DATA 相同的 token
+字节3：0x01 = PUSH_ACK
 ```
 
-**ackr锛坅cknowledged ratio锛?* 灏辨槸杩欎釜 ACK 鐨勫洖澶嶇巼锛?`lora_pkt_fwd.c` 缁熻 30 绉掑唴鍙戝嚭 PUSH_DATA 娆℃暟鍜屾敹鍒?PUSH_ACK 娆℃暟涔嬫瘮銆?
-#### PULL_DATA锛堢綉鍏?鈫?NS锛屼繚鎸佽繛鎺?/ 鎷夊彇涓嬭锛?
-缃戝叧姣忛殧 ~10 绉掑彂涓€娆★紝鐢ㄩ€旓細
-1. 鍛婅瘔 NS 缃戝叧鐨?UDP 鍑哄彛 IP:Port锛圢AT 绌块€忥級
-2. 璁?NS 鐭ラ亾缃戝叧鍦ㄧ嚎
+**ackr（acknowledged ratio）** 就是这个 ACK 的回复率，
+`lora_pkt_fwd.c` 统计 30 秒内发出 PUSH_DATA 次数和收到 PUSH_ACK 次数之比。
+
+#### PULL_DATA（网关 → NS，保持连接 / 拉取下行）
+
+网关每隔 ~10 秒发一次，用途：
+1. 告诉 NS 网关的 UDP 出口 IP:Port（NAT 穿透）
+2. 让 NS 知道网关在线
 
 ```
-瀛楄妭0锛?x02
-瀛楄妭1-2锛歵oken
-瀛楄妭3锛?x02 = PULL_DATA
-瀛楄妭4-11锛氱綉鍏?EUI
+字节0：0x02
+字节1-2：token
+字节3：0x02 = PULL_DATA
+字节4-11：网关 EUI
 ```
 
-#### PULL_ACK锛圢S 鈫?缃戝叧锛岀‘璁ゆ敹鍒?PULL_DATA锛?
+#### PULL_ACK（NS → 网关，确认收到 PULL_DATA）
+
 ```
-瀛楄妭0锛?x02
-瀛楄妭1-2锛氫笌 PULL_DATA 鐩稿悓 token
-瀛楄妭3锛?x04 = PULL_ACK
+字节0：0x02
+字节1-2：与 PULL_DATA 相同 token
+字节3：0x04 = PULL_ACK
 ```
 
-#### PULL_RESP锛圢S 鈫?缃戝叧锛屼笅琛屽彂鍖呮寚浠わ級
+#### PULL_RESP（NS → 网关，下行发包指令）
 
-NS 瑕佸彂涓嬭甯ф椂锛岄€氳繃涔嬪墠 PULL_DATA 纭鐨勫湴鍧€锛屽彂 PULL_RESP 缁欑綉鍏筹細
+NS 要发下行帧时，通过之前 PULL_DATA 确认的地址，发 PULL_RESP 给网关：
 
 ```json
 {
   "txpk": {
-    "imme": false,       // 鏄惁绔嬪嵆鍙戯紙false = 鐢?tmst 绮剧‘瀹氭椂锛?    "tmst": 12346678,    // 鍙戝皠鏃堕棿鎴筹紙涓婅 tmst + 1000000 for RX1锛?    "freq": 507.1,       // 涓嬭棰戠巼锛圡Hz锛?    "rfch": 0,           // 浣跨敤鍝釜 radio 鍙戝皠
-    "powe": 14,          // 鍙戝皠鍔熺巼锛坉Bm锛?    "modu": "LORA",
+    "imme": false,       // 是否立即发（false = 用 tmst 精确定时）
+    "tmst": 12346678,    // 发射时间戳（上行 tmst + 1000000 for RX1）
+    "freq": 507.1,       // 下行频率（MHz）
+    "rfch": 0,           // 使用哪个 radio 发射
+    "powe": 14,          // 发射功率（dBm）
+    "modu": "LORA",
     "datr": "SF12BW125",
     "codr": "4/5",
-    "ipol": true,        // 涓嬭鏋佸寲鍙嶈浆锛圠oRaWAN 瑙勫畾涓嬭蹇呴』 ipol=true锛?    "size": 17,
+    "ipol": true,        // 下行极化反转（LoRaWAN 规定下行必须 ipol=true）
+    "size": 17,
     "data": "YAFCAQABAAAAc..."
   }
 }
 ```
 
-> **鏋佸寲鍙嶈浆锛坕pol锛?* 鏄?LoRaWAN 鐨勪竴涓噸瑕佺粏鑺傦細
-> 鑺傜偣涓婅 ipol=false锛岀綉鍏充笅琛?ipol=true锛?> 杩欐牱涓や釜鑺傜偣鐩镐簰涔嬮棿鏀朵笉鍒板鏂圭殑涓婅鍖咃紝鍙湁缃戝叧锛坕pol=true锛夋墠鑳芥敹鍒拌妭鐐逛笂琛屻€?
+> **极化反转（ipol）** 是 LoRaWAN 的一个重要细节：
+> 节点上行 ipol=false，网关下行 ipol=true，
+> 这样两个节点相互之间收不到对方的上行包，只有网关（ipol=true）才能收到节点上行。
+
 ---
 
-### 2.3 杩炴帴鐘舵€佺淮鎶?
-Semtech UDP 鏄棤杩炴帴鐨勶紝缃戝叧闈犱互涓嬫満鍒剁淮鎶?鍦ㄧ嚎"鐘舵€侊細
+### 2.3 连接状态维护
+
+Semtech UDP 是无连接的，网关靠以下机制维护"在线"状态：
 
 ```
-缃戝叧                         NS (Gateway Bridge)
- 鈹傗攢鈹€鈹€鈹€鈹€ PUSH_DATA锛坰tats锛夆攢鈹€鈹€鈹€鈫掆攤  姣?0绉掍竴娆★紝鍚綉鍏崇粺璁℃暟鎹? 鈹傗啇鈹€鈹€鈹€鈹€ PUSH_ACK 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹?                            鈹? 鈹傗攢鈹€鈹€鈹€鈹€ PULL_DATA 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈫掆攤  姣?0绉掍竴娆? 鈹傗啇鈹€鈹€鈹€鈹€ PULL_ACK 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+网关                         NS (Gateway Bridge)
+ │───── PUSH_DATA（stats）────→│  每30秒一次，含网关统计数据
+ │←──── PUSH_ACK ─────────────│
+ │                             │
+ │───── PULL_DATA ─────────────→│  每10秒一次
+ │←──── PULL_ACK ─────────────│
+```
 
-NS 閫氳繃杩炵画鏀跺埌 PUSH_DATA 鎴?PULL_DATA 鏉ュ垽鏂綉鍏虫槸鍚﹀湪绾匡紝
-瓒呰繃涓€瀹氭椂闂存病鏀跺埌灏辨爣璁颁负绂荤嚎銆?
+NS 通过连续收到 PUSH_DATA 或 PULL_DATA 来判断网关是否在线，
+超过一定时间没收到就标记为离线。
+
 ---
 
-## 涓夈€丟ateway Bridge 鐨勪綔鐢?
-### 3.1 涓轰粈涔堥渶瑕?Gateway Bridge锛?
-ChirpStack NS 鍘熺敓浣跨敤 **MQTT** 涓庣綉鍏抽€氫俊锛?鑰?99% 鐨?LoRa 缃戝叧纭欢瀹炵幇鐨勬槸 Semtech UDP 鍗忚锛屼簩鑰呬笉鍏煎銆?
-Gateway Bridge 浣滀负閫傞厤鍣紝鎶?UDP 鍗忚杞崲鎴?MQTT锛?
+## 三、Gateway Bridge 的作用
+
+### 3.1 为什么需要 Gateway Bridge？
+
+ChirpStack NS 原生使用 **MQTT** 与网关通信，
+而 99% 的 LoRa 网关硬件实现的是 Semtech UDP 协议，二者不兼容。
+
+Gateway Bridge 作为适配器，把 UDP 协议转换成 MQTT：
+
 ```
-缃戝叧锛圲DP锛夆攢鈹€鈫?Gateway Bridge 鈹€鈹€鈫?MQTT Broker 鈹€鈹€鈫?ChirpStack NS
-                鈫?涔熷彲鍙嶅悜锛?                NS 閫氳繃 MQTT 鍙戝懡浠?鈫?Bridge 杞垚 UDP PULL_RESP 鈫?缃戝叧
+网关（UDP）──→ Gateway Bridge ──→ MQTT Broker ──→ ChirpStack NS
+                ↑ 也可反向：
+                NS 通过 MQTT 发命令 → Bridge 转成 UDP PULL_RESP → 网关
 ```
 
-### 3.2 MQTT Topic 瑙勮寖
+### 3.2 MQTT Topic 规范
 
-Gateway Bridge 鍙戝竷鍜岃闃呯殑 topic 鏍煎紡锛?
+Gateway Bridge 发布和订阅的 topic 格式：
+
 ```
 {topic_prefix}/gateway/{gateway_eui}/event/{event_type}
 {topic_prefix}/gateway/{gateway_eui}/state/{state_type}
 {topic_prefix}/gateway/{gateway_eui}/command/#
 ```
 
-| 瀛楁 | 鍚箟 | 绀轰緥 |
+| 字段 | 含义 | 示例 |
 |------|------|------|
-| `topic_prefix` | 棰戠巼璁″垝鏍囪瘑绗?| `cn470_10` |
-| `gateway_eui` | 缃戝叧 EUI锛?*灏忓啓鍗佸叚杩涘埗** | `aa555a00000021fb` |
-| `event_type` | 浜嬩欢绫诲瀷 | `up`锛堜笂琛岋級銆乣stats`锛堢粺璁★級銆乣ack` |
-| `state_type` | 鐘舵€佺被鍨?| `conn`锛堣繛鎺ョ姸鎬侊級|
+| `topic_prefix` | 频率计划标识符 | `cn470_10` |
+| `gateway_eui` | 网关 EUI，**小写十六进制** | `aa555a00000021fb` |
+| `event_type` | 事件类型 | `up`（上行）、`stats`（统计）、`ack` |
+| `state_type` | 状态类型 | `conn`（连接状态）|
 
-**瀹屾暣 topic 绀轰緥锛?*
+**完整 topic 示例：**
 
 ```
 cn470_10/gateway/aa555a00000021fb/event/up
@@ -149,82 +198,107 @@ cn470_10/gateway/aa555a00000021fb/state/conn
 cn470_10/gateway/aa555a00000021fb/command/#
 ```
 
-### 3.3 topic_prefix 涓庨鐜囪鍒掔殑鍏崇郴
+### 3.3 topic_prefix 与频率计划的关系
 
-`topic_prefix` **蹇呴』**涓?NS 涓?region 閰嶇疆鏂囦欢鐨?`topic_prefix` 瀛楁瀹屽叏涓€鑷淬€?
-杩欐槸 ChirpStack 鐭ラ亾"杩欎釜缃戝叧灞炰簬鍝釜棰戠巼璁″垝"鐨勫敮涓€渚濇嵁锛?
+`topic_prefix` **必须**与 NS 中 region 配置文件的 `topic_prefix` 字段完全一致。
+
+这是 ChirpStack 知道"这个网关属于哪个频率计划"的唯一依据：
+
 ```
-gateway-bridge 鐨?topic_prefix="cn470_10"
-        鈫?蹇呴』瀹屽叏涓€鑷达紙鍖呮嫭涓嬪垝绾裤€佹暟瀛楋級
-region_cn470_10.toml 鐨?topic_prefix="cn470_10"
+gateway-bridge 的 topic_prefix="cn470_10"
+        ↕ 必须完全一致（包括下划线、数字）
+region_cn470_10.toml 的 topic_prefix="cn470_10"
 ```
 
-濡傛灉涓嶄竴鑷达紙鍝€曞彧宸竴涓瓧绗?`cn470` vs `cn470_10`锛夛紝
-NS 灏辨敹涓嶅埌杩欎釜缃戝叧鐨勪换浣曟秷鎭紝GUI 姘歌繙鏄剧ず绂荤嚎銆?
+如果不一致（哪怕只差一个字符 `cn470` vs `cn470_10`），
+NS 就收不到这个网关的任何消息，GUI 永远显示离线。
+
 ---
 
-## 鍥涖€丩oRaWAN 缃戝叧鐨?閫忔槑杞彂"鍘熷垯
+## 四、LoRaWAN 网关的"透明转发"原则
 
-**缃戝叧涓嶅仛浠讳綍涓氬姟澶勭悊**锛屽彧璐熻矗鐗╃悊灞傛敹鍙戯紝杩欐槸 LoRaWAN 鏋舵瀯鐨勬牳蹇冭璁″師鍒欙細
+**网关不做任何业务处理**，只负责物理层收发，这是 LoRaWAN 架构的核心设计原则：
 
-| 缃戝叧鍋氱殑 | 缃戝叧涓嶅仛鐨?|
+| 网关做的 | 网关不做的 |
 |---------|----------|
-| 鎺ユ敹鎵€鏈?LoRa 甯э紙鏃犺鏄惁娉ㄥ唽锛墊 楠岃瘉 DevAddr |
-| 娴嬮噺 RSSI / SNR / 棰戝亸 | 瑙ｅ瘑 FRMPayload |
-| 鎵撲笂鎺ユ敹鏃堕棿鎴筹紙tmst锛墊 鍒ゆ柇 MIC 鏄惁鍚堟硶 |
-| 杞彂缁?NS锛堟棤杩囨护锛墊 ADR 鍐崇瓥 |
-| 鎵ц NS 涓嬭鍛戒护 | 缂撳瓨鏁版嵁 |
+| 接收所有 LoRa 帧（无论是否注册）| 验证 DevAddr |
+| 测量 RSSI / SNR / 频偏 | 解密 FRMPayload |
+| 打上接收时间戳（tmst）| 判断 MIC 是否合法 |
+| 转发给 NS（无过滤）| ADR 决策 |
+| 执行 NS 下行命令 | 缓存数据 |
 
-杩欐剰鍛崇潃锛?- 涓€涓?LoRa 鍖呭彲浠ュ悓鏃惰澶氫釜缃戝叧鏀跺埌锛孨S 璐熻矗**鍘婚噸**
-- 缃戝叧瑕嗙洊鑼冨洿鍐呮墍鏈夎澶囩殑涓婅鍖呴兘浼氳涓婃姤锛孨S 鏍规嵁 DevAddr 鍒ゆ柇鏄笉鏄嚜宸辩殑璁惧
-- 瀹夊叏鎬у畬鍏ㄧ敱 NS 鍜岃妭鐐逛箣闂寸殑 AES-128 鍔犲瘑淇濊瘉锛岀綉鍏虫棤娉曚吉閫?
+这意味着：
+- 一个 LoRa 包可以同时被多个网关收到，NS 负责**去重**
+- 网关覆盖范围内所有设备的上行包都会被上报，NS 根据 DevAddr 判断是不是自己的设备
+- 安全性完全由 NS 和节点之间的 AES-128 加密保证，网关无法伪造
+
 ---
 
-## 浜斻€丆lassA / ClassB / ClassC 鐨勪笅琛屾椂搴?
-LoRaWAN 瀹氫箟浜嗕笁绉嶈妭鐐瑰伐浣滄ā寮忥紝缃戝叧闇€瑕佺簿纭畾鏃跺彂涓嬭鍖咃細
+## 五、ClassA / ClassB / ClassC 的下行时序
 
-### ClassA锛堟渶甯哥敤锛?
+LoRaWAN 定义了三种节点工作模式，网关需要精确定时发下行包：
+
+### ClassA（最常用）
+
 ```
-鑺傜偣鍙戜笂琛?   鈹?   鈹溾攢鈹€ 1绉掑悗 鈹€鈹€鈫?RX1 绐楀彛锛堜笅琛岄鐜?涓婅棰戠巼鐨勬槧灏勫€硷紝SF=涓婅SF锛?   鈹?   鈹斺攢鈹€ 2绉掑悗 鈹€鈹€鈫?RX2 绐楀彛锛堝浐瀹氶鐜?05.3MHz锛孲F12锛?```
+节点发上行
+   │
+   ├── 1秒后 ──→ RX1 窗口（下行频率=上行频率的映射值，SF=上行SF）
+   │
+   └── 2秒后 ──→ RX2 窗口（固定频率505.3MHz，SF12）
+```
 
-姣忔涓婅鍚庢墠鏈変笅琛屾満浼氾紝鏈€鐪佺數銆侼S 蹇呴』鍦?RX1 鎴?RX2 涔嬩竴鍙戦€佷笅琛岋紝鍚﹀垯绛変笅娆′笂琛屻€?
+每次上行后才有下行机会，最省电。NS 必须在 RX1 或 RX2 之一发送下行，否则等下次上行。
+
 ### ClassB
 
-鍦?ClassA 鍩虹涓婏紝鑺傜偣鍛ㄦ湡鎬ф墦寮€"ping slot"鎺ユ敹绐楀彛锛?鐢ㄤ俊鏍囷紙Beacon锛夊悓姝ワ紝鍏佽 NS 鍦ㄥ浐瀹氭椂闅欎富鍔ㄤ笅琛岋紝寤惰繜鍙娴嬨€?
+在 ClassA 基础上，节点周期性打开"ping slot"接收窗口，
+用信标（Beacon）同步，允许 NS 在固定时隙主动下行，延迟可预测。
+
 ### ClassC
 
-鑺傜偣闄や簡鍙戦€佷笂琛岋紝鍏朵綑鏃堕棿**鎸佺画鐩戝惉**锛孨S 闅忔椂鍙互涓嬭銆?鍔熻€楁渶楂橈紝閫傚悎鏈夌ǔ瀹氱數婧愮殑璁惧锛堝鏅鸿兘鎻掑骇锛夈€?
----
-
-## 鍏€佷笅琛屽彂灏勬椂搴忕殑绮剧‘鎬ц姹?
-NS 璋冨害涓嬭鍖呮椂锛屼細鍦?PULL_RESP 鐨?`txpk.tmst` 涓寚瀹氱簿纭彂灏勬椂闂达細
-
-```
-tmst_tx = tmst_rx + RX1_delay 脳 1_000_000锛堝井绉掞級
-```
-
-鍏朵腑 `tmst_rx` 鏄綉鍏冲湪 PUSH_DATA 涓笂鎶ョ殑鎺ユ敹鏃堕棿鎴炽€?
-缃戝叧蹇呴』淇濊瘉鍦?`tmst_tx` 鏃跺埢锛堣宸?< 卤20 渭s锛夊紑濮嬪彂灏勶紝
-鍚﹀垯鑺傜偣鐨?RX 绐楀彛鍏抽棴锛屼笅琛屽寘涓㈠け銆?
-SX1302 鍐呯疆纭欢瀹氭椂鍣ㄧ敤浜庝繚璇佽繖涓簿搴︼紝杩欎篃鏄负浠€涔堢綉鍏充笉鑳界敤绾蒋浠舵柟妗堢殑鍘熷洜銆?
----
-
-## 涓冦€佸缃戝叧瑕嗙洊涓庡幓閲?
-褰撳涓綉鍏抽兘瑕嗙洊鍚屼竴鍖哄煙鏃讹紝鍚屼竴涓笂琛屽寘浼氳澶氫釜缃戝叧鏀跺埌骞朵笂鎶ワ細
-
-```
-Node 鈹€鈹€涓婅鈹€鈹€鈫?Gateway A 鈹€鈹€PUSH_DATA鈹€鈹€鈫?NS
-           鈹斺攢鈹€鈫?Gateway B 鈹€鈹€PUSH_DATA鈹€鈹€鈫?NS  锛堝悓涓€涓寘锛屼袱浠斤級
-```
-
-NS 鐨勫幓閲嶉€昏緫锛圕hirpStack 涓殑 deduplication window锛夛細
-
-1. 鏀跺埌绗竴浠斤紝鍚姩鍘婚噸绐楀彛锛堥粯璁?200ms锛?2. 绐楀彛鍐呮敹鍒扮殑鍏朵粬鍓湰璁板綍 metadata锛圧SSI銆丼NR銆佺綉鍏矱UI绛夛級
-3. 绐楀彛缁撴潫鍚庯紝閫夋嫨淇″彿鏈€寮虹殑閭ｄ唤澶勭悊锛屽叾浣欎涪寮?4. 鎶婃墍鏈夌綉鍏崇殑 metadata 姹囨€伙紝渚夸簬缃戠粶浼樺寲
+节点除了发送上行，其余时间**持续监听**，NS 随时可以下行。
+功耗最高，适合有稳定电源的设备（如智能插座）。
 
 ---
 
-## 鍙傝€冭祫鏂?
-- LoRa Alliance锛歀oRaWAN Specification v1.0.4
-- Semtech锛歔UDP Packet Forwarder Protocol](https://github.com/Lora-net/packet_forwarder/blob/master/PROTOCOL.TXT)
-- ChirpStack Gateway Bridge锛歨ttps://www.chirpstack.io/docs/chirpstack-gateway-bridge/
+## 六、下行发射时序的精确性要求
+
+NS 调度下行包时，会在 PULL_RESP 的 `txpk.tmst` 中指定精确发射时间：
+
+```
+tmst_tx = tmst_rx + RX1_delay × 1_000_000（微秒）
+```
+
+其中 `tmst_rx` 是网关在 PUSH_DATA 中上报的接收时间戳。
+
+网关必须保证在 `tmst_tx` 时刻（误差 < ±20 μs）开始发射，
+否则节点的 RX 窗口关闭，下行包丢失。
+
+SX1302 内置硬件定时器用于保证这个精度，这也是为什么网关不能用纯软件方案的原因。
+
+---
+
+## 七、多网关覆盖与去重
+
+当多个网关都覆盖同一区域时，同一个上行包会被多个网关收到并上报：
+
+```
+Node ──上行──→ Gateway A ──PUSH_DATA──→ NS
+           └──→ Gateway B ──PUSH_DATA──→ NS  （同一个包，两份）
+```
+
+NS 的去重逻辑（ChirpStack 中的 deduplication window）：
+
+1. 收到第一份，启动去重窗口（默认 200ms）
+2. 窗口内收到的其他副本记录 metadata（RSSI、SNR、网关EUI等）
+3. 窗口结束后，选择信号最强的那份处理，其余丢弃
+4. 把所有网关的 metadata 汇总，便于网络优化
+
+---
+
+## 参考资料
+
+- LoRa Alliance：LoRaWAN Specification v1.0.4
+- Semtech：[UDP Packet Forwarder Protocol](https://github.com/Lora-net/packet_forwarder/blob/master/PROTOCOL.TXT)
+- ChirpStack Gateway Bridge：https://www.chirpstack.io/docs/chirpstack-gateway-bridge/
