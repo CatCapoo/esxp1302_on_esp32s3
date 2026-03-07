@@ -921,7 +921,7 @@ void ChipParametersConfiguration(void)
 
     if (ctlwizchip(CW_INIT_WIZCHIP, (void*)memsize) == -1) {
         printf("[W5500] ERROR: CW_INIT_WIZCHIP failed (SPI error?)\r\n");
-        while(1);   /* fatal: SPI not working */
+        return;   /* non-fatal: let upper layer handle the error */
     }
 
     /* Wait for Ethernet PHY link-up (cable must be connected) */
@@ -930,15 +930,17 @@ void ChipParametersConfiguration(void)
     do {
         if (ctlwizchip(CW_GET_PHYLINK, (void*)&tmp) == -1) {
             printf("[W5500] ERROR: CW_GET_PHYLINK failed (SPI error?)\r\n");
-            while(1);
+            return;
         }
         if ((HAL_GetTick() - t0) > 5000) {
             printf("[W5500] ERROR: PHY link timeout - check Ethernet cable!\r\n");
-            while(1);
+            break;
         }
     } while (tmp == PHY_LINK_OFF);
 
-    printf("[W5500] PHY link UP\r\n");
+    if (tmp != PHY_LINK_OFF) {
+        printf("[W5500] PHY link UP\r\n");
+    }
 }
 
 

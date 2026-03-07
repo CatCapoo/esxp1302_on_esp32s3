@@ -99,7 +99,7 @@ int main(void)
   MX_I2C2_Init();
   MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
-  /* 启动 TIM2 微秒计时�???? */
+  /* 启动 TIM2 微秒计时�???? */
   HAL_TIM_Base_Start(&htim2);
 
   /* 串口打印 */
@@ -173,10 +173,17 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 
 /**
- * @brief  Retarget printf to UART1
+ * @brief  Retarget printf to UART1.
+ *         Auto-inserts '\r' before every '\n' (LF -> CR+LF) so that
+ *         serial terminals display correctly without special settings.
+ *         Thread-safety is provided by mx_printf mutex in _write().
  */
 int __io_putchar(int ch)
 {
+    if (ch == '\n') {
+        uint8_t cr = '\r';
+        HAL_UART_Transmit(&huart1, &cr, 1, HAL_MAX_DELAY);
+    }
     HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
     return ch;
 }
@@ -211,10 +218,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
+  /* Rapid-blink both LEDs to signal a fatal error (visible without serial).
+     Uses GPIO toggle since SysTick is dead after __disable_irq. */
   __disable_irq();
   while (1)
   {
+    HAL_GPIO_TogglePin(LED0_GPIO_Port, LED0_Pin);
+    HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+    for (volatile uint32_t i = 0; i < 2000000; i++) { __NOP(); }
   }
   /* USER CODE END Error_Handler_Debug */
 }

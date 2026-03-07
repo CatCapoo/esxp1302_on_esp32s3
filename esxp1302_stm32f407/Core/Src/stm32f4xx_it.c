@@ -94,6 +94,14 @@ void HardFault_Handler(void)
   while (1)
   {
     /* USER CODE BEGIN W1_HardFault_IRQn 0 */
+    /* LED0 快闪 2 次 (HardFault 信号) */
+    for (int i = 0; i < 2; i++) {
+      HAL_GPIO_TogglePin(LED0_GPIO_Port, LED0_Pin);
+      for (volatile uint32_t d = 0; d < 200000; d++);
+      HAL_GPIO_TogglePin(LED0_GPIO_Port, LED0_Pin);
+      for (volatile uint32_t d = 0; d < 200000; d++);
+    }
+    for (volatile uint32_t d = 0; d < 1000000; d++);
     /* USER CODE END W1_HardFault_IRQn 0 */
   }
 }
@@ -109,6 +117,14 @@ void MemManage_Handler(void)
   while (1)
   {
     /* USER CODE BEGIN W1_MemoryManagement_IRQn 0 */
+    /* LED0 快闪 3 次 (MemManage 信号) */
+    for (int i = 0; i < 3; i++) {
+      HAL_GPIO_TogglePin(LED0_GPIO_Port, LED0_Pin);
+      for (volatile uint32_t d = 0; d < 200000; d++);
+      HAL_GPIO_TogglePin(LED0_GPIO_Port, LED0_Pin);
+      for (volatile uint32_t d = 0; d < 200000; d++);
+    }
+    for (volatile uint32_t d = 0; d < 1000000; d++);
     /* USER CODE END W1_MemoryManagement_IRQn 0 */
   }
 }
@@ -124,6 +140,14 @@ void BusFault_Handler(void)
   while (1)
   {
     /* USER CODE BEGIN W1_BusFault_IRQn 0 */
+    /* LED0 快闪 4 次 (BusFault 信号) */
+    for (int i = 0; i < 4; i++) {
+      HAL_GPIO_TogglePin(LED0_GPIO_Port, LED0_Pin);
+      for (volatile uint32_t d = 0; d < 200000; d++);
+      HAL_GPIO_TogglePin(LED0_GPIO_Port, LED0_Pin);
+      for (volatile uint32_t d = 0; d < 200000; d++);
+    }
+    for (volatile uint32_t d = 0; d < 1000000; d++);
     /* USER CODE END W1_BusFault_IRQn 0 */
   }
 }
@@ -139,6 +163,14 @@ void UsageFault_Handler(void)
   while (1)
   {
     /* USER CODE BEGIN W1_UsageFault_IRQn 0 */
+    /* LED0 快闪 5 次 (UsageFault 信号) */
+    for (int i = 0; i < 5; i++) {
+      HAL_GPIO_TogglePin(LED0_GPIO_Port, LED0_Pin);
+      for (volatile uint32_t d = 0; d < 200000; d++);
+      HAL_GPIO_TogglePin(LED0_GPIO_Port, LED0_Pin);
+      for (volatile uint32_t d = 0; d < 200000; d++);
+    }
+    for (volatile uint32_t d = 0; d < 1000000; d++);
     /* USER CODE END W1_UsageFault_IRQn 0 */
   }
 }
