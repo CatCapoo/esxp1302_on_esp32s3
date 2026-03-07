@@ -12,37 +12,55 @@ e77_node_ctrl.py — E77-xxxM22S LoRaWAN 节点 AT 指令控制脚本
   send      — 仅发送一包数据（需已入网前提）
   restore   — 恢复出厂配置
 
-使用示例：
-  # OTAA 入网，CN470，区域 2，每 30 秒发一包
-  # （--deveui 填 E77 出厂 DevEUI，--appkey 填 ChirpStack 里配置的 AppKey）
-  python scripts/e77_node_ctrl.py otaa \\
-      --port COM18 \\
+使用示例（Linux 用 /dev/ttyUSBx，Windows 用 COMx）：
+
+  # 查询模块参数
+  python3 scripts/e77_node_ctrl.py query --port /dev/ttyUSB0        # Linux
+  python  scripts/e77_node_ctrl.py query --port COM4                 # Windows
+
+  # 恢复出厂（每次新测试前必须执行）
+  python3 scripts/e77_node_ctrl.py restore --port /dev/ttyUSB0
+
+  # OTAA 入网 + 持续发包（CN470-10，CH80~CH87）
+  python3 scripts/e77_node_ctrl.py otaa \\
+      --port /dev/ttyUSB0 \\
       --region 2 \\
       --deveui AABBCCDD11223344 \\
       --appeui 0000000000000000 \\
       --appkey 00112233445566778899AABBCCDDEEFF \\
-      --chanmask 0001:0000:0000:0000:0000:0000 \\
-      --interval 30 \\
+      --chanmask 0000:0000:0000:0000:0000:00FF \\
+      --adr 1 --interval 30 \\
       --payload DEADBEEF01020304
 
-  # ABP 入网，CN470，SubBand1
-  python scripts/e77_node_ctrl.py abp \\
-      --port COM18 \\
+  # OTAA + Confirmed uplink（验证双向链路）
+  python3 scripts/e77_node_ctrl.py otaa \\
+      --port /dev/ttyUSB0 \\
+      --region 2 --deveui AABBCCDD11223344 \\
+      --appeui 0000000000000000 \\
+      --appkey 00112233445566778899AABBCCDDEEFF \\
+      --chanmask 0000:0000:0000:0000:0000:00FF \\
+      --adr 1 --interval 10 --ack 1
+
+  # OTAA + 发固定次数后退出
+  python3 scripts/e77_node_ctrl.py otaa \\
+      --port /dev/ttyUSB0 --region 2 \\
+      --deveui AABBCCDD11223344 --appeui 0000000000000000 \\
+      --appkey 00112233445566778899AABBCCDDEEFF \\
+      --chanmask 0000:0000:0000:0000:0000:00FF \\
+      --interval 20 --count 5 --ack 1
+
+  # ABP 入网（SubBand1 mock NS 测试用）
+  python3 scripts/e77_node_ctrl.py abp \\
+      --port /dev/ttyUSB0 \\
       --region 2 \\
       --devaddr 26011234 \\
       --nwkskey 00112233445566778899AABBCCDDEEFF \\
       --appskey FFEEDDCCBBAA99887766554433221100 \\
       --chanmask 0001:0000:0000:0000:0000:0000 \\
-      --interval 60
+      --adr 0 --dr 2 --interval 5
 
-  # 仅查询参数
-  python scripts/e77_node_ctrl.py query --port COM18
-
-  # 发一包（已入网前提下）
-  python scripts/e77_node_ctrl.py send --port COM18 --payload CAFEBABE
-
-  # 恢复出厂
-  python scripts/e77_node_ctrl.py restore --port COM18
+  # 仅发一包（已入网前提下）
+  python3 scripts/e77_node_ctrl.py send --port /dev/ttyUSB0 --payload CAFEBABE
 
 注意：
   - CN470 region=2，信道掩码默认 SubBand1（mask=0001:0000:0000:0000:0000:0000）
@@ -222,7 +240,14 @@ class E77Node:
         region:   见 REGION_MAP
         chanmask: CN470/US915/AU915 用，如 "0001:0000:0000:0000:0000:0000"
         dr:       None = 不强制设置（ADR 管理）；0~5 = 强制 SF
+
+        注：E77 在入网状态下不允许修改 REGION/CDEVEUI 等参数（AT_PARAM_ERROR/AT_ERROR），
+            因此每次配置前先 restore 恢复出厂状态，确保参数设置成功。
         """
+        # 先恢复出厂，解除入网锁定状态，使参数可写
+        self.restore()
+        time.sleep(0.5)   # restore 内已等 2s，额外 0.5s 确保启动稳定
+
         steps = [
             (f"AT+REGION={region}",          "设置频段"),
             (f"AT+CDEVEUI={deveui.upper()}", "设置 DevEUI"),
@@ -265,7 +290,13 @@ class E77Node:
         """
         配置并执行 ABP 本地入网。
         devaddr: 8 位 hex，如 "26011234"（无冒号时自动加冒号）
+
+        注：同 OTAA，先 restore 解除入网锁定，确保参数可写。
         """
+        # 先恢复出厂，解除入网锁定状态
+        self.restore()
+        time.sleep(0.5)
+
         # 自动格式化 devaddr 为 XX:XX:XX:XX
         if ":" not in devaddr and len(devaddr) == 8:
             devaddr = ":".join(devaddr[i:i+2] for i in range(0, 8, 2))
@@ -389,7 +420,7 @@ def build_parser():
     p.add_argument("command", choices=["otaa", "abp", "query", "send", "restore"],
                    help="执行的动作")
     p.add_argument("--port",     required=True,
-                   help="串口设备，如 COM18 或 /dev/ttyUSB0")
+                   help="串口设备：Linux 用 /dev/ttyUSBx，Windows 用 COMx")
     p.add_argument("--baud",     type=int, default=9600,
                    help="波特率（默认 9600）")
     p.add_argument("--verbose",  action="store_true",

@@ -179,6 +179,8 @@
 | B15 | CRC/IQ 不匹配 | 测试 | 高 |
 | B16 | stat 时间戳格式错误 | 集成 | **致命** |
 | B17 | 链接脚本未保护配置扇区 | 工程 | 高 |
+| B18 | rfconf.tx_enable 未赋值，下行 TX 全失败 | E2E 测试 | **致命** |
+| B19 | E77 入网后 AT 参数不可写 | 测试脚本 | 中 |
 
 ---
 
@@ -207,3 +209,52 @@
 | 修复 | `FLASH LENGTH = 896K`（Sectors 0-10），Sector 11 不再属于可链接区域；固件超限时链接器报错而非静默覆盖 |
 | 文件 | `STM32F407ZGTx_FLASH_cmake.ld` |
 | 详见 | [impl/06_freq_plan_flash_config_v4.md](../impl/06_freq_plan_flash_config_v4.md#part-4链接脚本-flash-区域保护) |
+
+---
+
+## 阶段六：OTAA 端到端测试
+
+### B18 — `rfconf.tx_enable` 未赋值导致 JoinAccept（所有下行）TX 全失败
+
+| 项目 | 内容 |
+|------|------|
+| 阶段 | E2E 测试（OTAA 入网） |
+| 现象 | E77 节点反复 `+EVT:JOIN FAILED`；网关统计 `RF packets sent: 1 / TX errors: 1`；`gateway-bridge` 日志有 `event=up`（收包正常）和 `event=ack`（NS 已下发 JoinAccept），但节点从未收到 |
+| 定位 | 三层诊断：Layer 1（gateway-bridge `event=up`）✅；Layer 2（ChirpStack NS join 事件）✅；Layer 3（节点 `+EVT:JOINED`）❌ → 下行 TX 本身失败 |
+| 根因 | `lora_pkt_fwd.c` 的 Radio 配置循环中，从 JSON 解析出 `conf_is_tx_enable[i]` 之后，**只更新了本地数组，从未赋值给 `rfconf.tx_enable`**，导致 `lgw_rxrf_setconf()` 调用时 `rfconf.tx_enable = 0`（默认零值），SX1302 HAL 将该 RF 链路标记为 TX 禁用。随后每次下行，`lgw_send()` 返回 `LGW_HAL_ERROR`，pkt_fwd 日志输出 `ERROR: SELECTED RF_CHAIN IS DISABLED FOR TX ON SELECTED BOARD` |
+| 修复 | 在 Radio 配置解析块末尾补一行：`rfconf.tx_enable = conf_is_tx_enable[i];` |
+| 代码位置 | `packet_forwarder/lora_pkt_fwd.c`，`parse_radio_configuration()` 内，`lgw_rxrf_setconf(i, rfconf)` 之前 |
+| 修复前后对比 | 修复前：`gateway-bridge` 始终无 `event=ack`（或 ack 后 TX error）；修复后：JoinAccept 成功发送，节点 `+EVT:JOINED`，RSSI/SNR 均正常 |
+| 影响范围 | 所有下行帧（JoinAccept、Confirmed ACK、ADR 命令、应用下行）均受影响；网关在此 Bug 下实际**完全无下行能力** |
+| 潜伏时间 | 此 Bug 自移植初期就存在，但之前测试（HAL TX 测试、ABP 测试）均未触发下行路径，因此未被发现 |
+
+**修复 diff（核心）：**
+
+```c
+/* 修复前（lora_pkt_fwd.c，radio 配置循环末尾）*/
+rfconf.freq_hz     = (uint32_t)json_object_get_number(conf_obj, "freq");
+rfconf.rssi_offset = (float)json_object_get_number(conf_obj, "rssi_offset");
+rfconf.rssi_tcomp  = ...;
+rfconf.type        = ...;
+// ← 缺少 rfconf.tx_enable = conf_is_tx_enable[i];
+if (lgw_rxrf_setconf(i, rfconf) != LGW_HAL_SUCCESS) { ... }
+
+/* 修复后 */
+rfconf.tx_enable   = conf_is_tx_enable[i];   // ← 补加这一行
+if (lgw_rxrf_setconf(i, rfconf) != LGW_HAL_SUCCESS) { ... }
+```
+
+---
+
+### B19 — E77 入网状态下 AT 参数命令报 `AT_PARAM_ERROR` / `AT_ERROR`
+
+| 项目 | 内容 |
+|------|------|
+| 阶段 | E2E 测试（测试脚本） |
+| 现象 | `e77_node_ctrl.py otaa` 执行时，`AT+REGION=2`、`AT+CDEVEUI=…`、`AT+CAPPEUI=…`、`AT+CAPPKEY=…` 均失败（`AT_PARAM_ERROR` 或 `AT_ERROR`），但 `AT+CMANUALMASK`、`AT+CFREQBANDMASK`、`AT+CTXP`、`AT+CADR` 成功；最终 OTAA 入网仍可成功（之前的参数未变） |
+| 根因 | E77-400M22S 固件规定：设备处于已入网（Joined）状态时，`REGION`、`CDEVEUI`、`CAPPEUI`、`CAPPKEY` 等入网凭据类命令被锁定，拒绝修改（返回错误）。脚本在重复调用 `otaa` 子命令时，模块仍保持上一次的入网状态，导致参数写入失败 |
+| 验证 | `AT+REGION=?` 返回 `2:CN470` —— 证明值本身已正确，仅因已入网而拒绝 SET |
+| 修复 | 在 `config_otaa()` 和 `config_abp()` 函数开头调用 `self.restore()`，先恢复出厂状态（清除入网状态），再依次写入参数；`restore()` 内部已等待 2 秒重启完成，额外加 0.5 秒确保稳定 |
+| 文件 | `scripts/e77_node_ctrl.py` |
+| 副作用 | `restore()` 会将 DevEUI 恢复为出厂值（`0080E11506A99424`），但随即被 `AT+CDEVEUI=AABBCCDD11223344` 覆盖，无影响 |
+| 修复验证 | 修复后连续三次运行 `otaa` 子命令，每次全部 AT 指令均返回 `OK`，无警告 |

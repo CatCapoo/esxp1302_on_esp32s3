@@ -23,7 +23,7 @@ W5500 以太网 (192.168.10.15) ────── 直连网线 ─────�
 | 阶段 | NS | 目的 |
 |------|----|----|
 | **阶段一（已完成）** | `lora_ns_mock.py` mock NS | 验证 GW→NS UDP 链路、上行转发、统计信息 |
-| **阶段二（待做）** | ChirpStack（Linux 以太网）| 验证 OTAA 入网、下行 ACK、ADR |
+| **阶段二（已完成）** | ChirpStack（Linux 以太网）| 验证 OTAA 入网、下行 ACK、ADR |
 
 ---
 
@@ -60,7 +60,7 @@ W5500 以太网 (192.168.10.15) ────── 直连网线 ─────�
 
 | 参数 | 值 |
 |------|----|
-| DevEUI（出厂固化）| 通过 `AT+CDEVEUI=?` 查询（本次 `AABBCCDD11223344`） |
+| DevEUI（出厂固化）| 通过 `AT+CDEVEUI=?` 查询（本次 `0080E11506A99424`） |
 | DevAddr（测试用）| `26011234` |
 | NwkSKey（测试用）| `00112233445566778899AABBCCDDEEFF` |
 | AppSKey（测试用）| `FFEEDDCCBBAA99887766554433221100` |
@@ -94,9 +94,27 @@ python scripts/lora_ns_mock.py 1680
 [down] PULL_ACK received in 5 ms
 ```
 
-#### 3. E77 ABP 发包（PC 终端 B）
+#### 3. E77 ABP 发包（终端 B）
+
+```bash
+# Linux
+python3 scripts/e77_node_ctrl.py restore --port /dev/ttyUSB1
+
+python3 scripts/e77_node_ctrl.py abp \
+    --port /dev/ttyUSB1 \
+    --devaddr 26011234 \
+    --nwkskey 00112233445566778899AABBCCDDEEFF \
+    --appskey FFEEDDCCBBAA99887766554433221100 \
+    --chanmask 0001:0000:0000:0000:0000:0000 \
+    --adr 0 --dr 2 \
+    --interval 5 \
+    --payload DEADBEEF01020304
+```
 
 ```powershell
+# Windows（PowerShell，` 续行；COMx 换成实际端口）
+python scripts/e77_node_ctrl.py restore --port COM17
+
 python scripts/e77_node_ctrl.py abp `
     --port COM17 `
     --devaddr 26011234 `
@@ -109,7 +127,7 @@ python scripts/e77_node_ctrl.py abp `
 ```
 
 > **注意**：若 E77 出现 `AT_PARAM_ERROR` / `AT_ERROR` 说明有历史配置冲突，先执行
-> `python scripts/e77_node_ctrl.py restore --port COM17` 清除后重新运行。
+> `restore` 子命令清除旧配置后重新运行（见上方第一条命令）。
 
 ### 测试结果（2026-03-04，已验证 ✅）
 
@@ -172,59 +190,224 @@ INFO: [down] PULL_ACK received in 5 ms
 
 ---
 
-## 阶段二：ChirpStack OTAA 测试（待做）
+## 阶段二：ChirpStack OTAA 测试
 
-> **前提**：切换到 Linux 以太网环境后，通过 UART CLI 修改 NS 地址（无需重新烧录）。
+> **网络环境**：网关通过以太网连接到运行 ChirpStack v4 Docker 的主机（192.168.71.100），  
+> Gateway Bridge 监听 UDP 1700，E77 串口接到同一台主机的 `/dev/ttyUSB1`。
 
 ### 切换 NS 地址
 
 用任意串口终端连接网关 UART（115200 bps），执行：
 
 ```
-ns <linux_server_ip> 1700
+ns 192.168.71.100 1700
 save
 ```
 
-其中 `<linux_server_ip>` 为 Linux 主机在以太网上的实际 IP，Gateway Bridge 默认端口 1700。
-
 确认后网关串口会出现：
 ```
-[cfg] ns_host = <linux_server_ip>
+[cfg] ns_host = 192.168.71.100
 [cfg] ns_port_up = 1700 / ns_port_down = 1700
 [down] PULL_ACK received in X ms
 ```
 
-### E77 OTAA 命令
-
-ChirpStack 中需预先创建设备，配置与下面参数一致：
+### ChirpStack 设备预配置
 
 | 参数 | 值 |
-|------|----|
-| DevEUI | E77 出厂值（`AT+CDEVEUI=?` 查询）|
+|------|-----|
+| DevEUI | `AABBCCDD11223344`（测试写入值，见下方说明）|
 | AppEUI（JoinEUI）| `0000000000000000` |
-| AppKey | 自定义 32 hex，填入 ChirpStack Device |
+| AppKey | `00112233445566778899AABBCCDDEEFF`（与命令 `--appkey` 完全一致）|
 | chanmask | `0000:0000:0000:0000:0000:00FF`（CN470-10，CH80~CH87）|
 | Region | `2`（CN470）|
 
-```bash
-# Linux 端运行（将 COM17 换为 /dev/ttyUSBx）
-python3 scripts/e77_node_ctrl.py restore --port /dev/ttyUSB0
+> **DevEUI 说明**：`AABBCCDD11223344` 是通过 `AT+CDEVEUI` 写入的测试 DevEUI，ChirpStack 中已用该值注册设备。  
+> E77 出厂（`AT+RESTORE` 后）的工厂 DevEUI 为 `0080E11506A99424`；  
+> OTAA 脚本执行时会通过 `AT+CDEVEUI=AABBCCDD11223344` 将模块 DevEUI 覆写为测试值，无需手动操作。
 
+> **chanmask 注意**：阶段一（SubBand1 = `0001:...:0000`，470.3~471.7 MHz）与  
+> ChirpStack CN470-10（`0000:...:00FF`，486.3~487.7 MHz）**不同**，  
+> 切换时必须更新 chanmask，否则上行频率与网关 RF 不匹配，且 RX1 下行窗口频率也会偏移。
+
+### 可直接复制的测试命令
+
+> 每次新测试前必须先执行 `restore` 清除旧配置，否则 `AT+CAPPKEY` 等命令可能返回 `AT_ERROR`。
+
+#### ① 查询 DevEUI
+
+```bash
+python3 scripts/e77_node_ctrl.py query --port /dev/ttyUSB1
+```
+
+#### ② 清除旧配置（每次必做）
+
+```bash
+python3 scripts/e77_node_ctrl.py restore --port /dev/ttyUSB1
+```
+
+#### ③ OTAA 入网 + 持续发包（30 s 间隔，无限循环）
+
+```bash
 python3 scripts/e77_node_ctrl.py otaa \
-    --port /dev/ttyUSB0 \
+    --port /dev/ttyUSB1 \
     --region 2 \
-    --deveui <AT+CDEVEUI=? 查询结果> \
+    --deveui AABBCCDD11223344 \
     --appeui 0000000000000000 \
-    --appkey <ChirpStack 中配置的 AppKey> \
+    --appkey 00112233445566778899AABBCCDDEEFF \
     --chanmask 0000:0000:0000:0000:0000:00FF \
-    --adr 1 \
-    --interval 30 \
+    --adr 1 --interval 30 \
     --payload DEADBEEF01020304
 ```
 
-> **chanmask 注意**：阶段一（SubBand1 = `0001:...:0000`，470.3~471.7 MHz）与  
-> ChirpStack CN470-10（SubBand10 = `0000:...:00FF`，486.3~487.7 MHz）**不同**，  
-> 切换到 ChirpStack 时必须更新 chanmask，否则节点发包频率与网关 RF 配置不匹配。
+预期输出：
+```
+[19:41:02] [OK  ] ✓ OTAA 入网成功！
+[19:41:03] [INFO] ─── 第 1 包 ─────────────────────────────────
+[19:41:03] [INFO] 发送上行 → port=2 ack=0 payload=DEADBEEF01020304
+[19:41:04] [OK  ] TX 确认: +EVT:SEND_OK
+[19:41:04] [INFO] 本次无下行（Class A 正常现象）
+[19:41:34] [INFO] ─── 第 2 包 ─────────────────────────────────
+...（每 30 秒发一包，Ctrl+C 停止）
+```
+
+#### ④ OTAA + Confirmed uplink（验证双向通信，10 s 间隔）
+
+```bash
+python3 scripts/e77_node_ctrl.py otaa \
+    --port /dev/ttyUSB1 \
+    --region 2 \
+    --deveui AABBCCDD11223344 \
+    --appeui 0000000000000000 \
+    --appkey 00112233445566778899AABBCCDDEEFF \
+    --chanmask 0000:0000:0000:0000:0000:00FF \
+    --adr 1 --interval 10 --ack 1 \
+    --payload DEADBEEF01020304
+```
+
+预期：每包收到 `+EVT:SEND_CONFIRMED` + `+EVT:RX_1` 下行 ACK。
+
+#### ⑤ OTAA + 发固定包数后退出（快速冒烟测试，5 包）
+
+```bash
+python3 scripts/e77_node_ctrl.py otaa \
+    --port /dev/ttyUSB1 \
+    --region 2 \
+    --deveui AABBCCDD11223344 \
+    --appeui 0000000000000000 \
+    --appkey 00112233445566778899AABBCCDDEEFF \
+    --chanmask 0000:0000:0000:0000:0000:00FF \
+    --adr 1 --interval 20 --count 5 --ack 1
+```
+
+#### ⑥ ABP 入网（ChirpStack CN470-10，跳过 Join 流程）
+
+**前置条件**：在 ChirpStack Device → **Activation** 标签页手动填写：
+- DevAddr: `26011234`
+- NwkSEncKey: `00112233445566778899AABBCCDDEEFF`
+- AppSKey: `FFEEDDCCBBAA99887766554433221100`
+
+```bash
+python3 scripts/e77_node_ctrl.py restore --port /dev/ttyUSB1
+
+python3 scripts/e77_node_ctrl.py abp \
+    --port /dev/ttyUSB1 \
+    --region 2 \
+    --devaddr 26011234 \
+    --nwkskey 00112233445566778899AABBCCDDEEFF \
+    --appskey FFEEDDCCBBAA99887766554433221100 \
+    --chanmask 0000:0000:0000:0000:0000:00FF \
+    --adr 0 --dr 2 \
+    --interval 60
+```
+
+> 注意 chanmask 是 `00FF`（CH80~CH87），与阶段一的 `0001`（CH0~7）不同。
+
+#### ⑦ 仅发一包（已入网后）
+
+```bash
+python3 scripts/e77_node_ctrl.py send \
+    --port /dev/ttyUSB1 \
+    --payload CAFEBABE \
+    --port-fwd 10 \
+    --ack 0
+```
+
+**前提**：节点已成功 OTAA 或 ABP 入网（当次串口会话未断开）。  
+发送 FPort=10、payload=`CAFEBABE` 的 unconfirmed 上行，发完自动退出。
+
+#### ⑧ verbose 模式（诊断 AT 串口通信）
+
+```bash
+python3 scripts/e77_node_ctrl.py query --port /dev/ttyUSB1 --verbose
+```
+
+### Windows 对应命令（PowerShell，`` ` `` 续行，COMx 替换为实际端口）
+
+```powershell
+# 清除旧配置
+python scripts/e77_node_ctrl.py restore --port COM4
+
+# OTAA + 持续发包
+python scripts/e77_node_ctrl.py otaa `
+    --port COM4 `
+    --region 2 `
+    --deveui AABBCCDD11223344 `
+    --appeui 0000000000000000 `
+    --appkey 00112233445566778899AABBCCDDEEFF `
+    --chanmask 0000:0000:0000:0000:0000:00FF `
+    --adr 1 --interval 30 `
+    --payload DEADBEEF01020304
+
+# OTAA + Confirmed uplink
+python scripts/e77_node_ctrl.py otaa `
+    --port COM4 `
+    --region 2 `
+    --deveui AABBCCDD11223344 `
+    --appeui 0000000000000000 `
+    --appkey 00112233445566778899AABBCCDDEEFF `
+    --chanmask 0000:0000:0000:0000:0000:00FF `
+    --adr 1 --interval 10 --ack 1
+
+# ABP（CN470-10）
+python scripts/e77_node_ctrl.py abp `
+    --port COM4 `
+    --region 2 `
+    --devaddr 26011234 `
+    --nwkskey 00112233445566778899AABBCCDDEEFF `
+    --appskey FFEEDDCCBBAA99887766554433221100 `
+    --chanmask 0000:0000:0000:0000:0000:00FF `
+    --adr 0 --dr 2 --interval 60
+
+# 仅发一包
+python scripts/e77_node_ctrl.py send `
+    --port COM4 `
+    --payload CAFEBABE `
+    --port-fwd 10 `
+    --ack 0
+```
+
+---
+
+### 测试结果（2026-03-07，已验证 ✅）
+
+> 测试过程中发现并修复了两个 Bug，详见 [bugs_and_fixes.md](../troubleshooting/bugs_and_fixes.md)：  
+> - **B18**：`rfconf.tx_enable` 未赋值，导致所有下行帧（JoinAccept / Confirmed ACK / ADR）TX 全部失败  
+> - **B19**：E77 已入网状态下 AT 参数命令被锁定，脚本现已在 `config_otaa/abp` 前自动调用 `restore()`
+
+| 检查项 | 结果 |
+|--------|------|
+| AT 参数全部配置成功（无 WARN） | ✅ |
+| OTAA 入网 `+EVT:JOINED` | ✅ |
+| JoinRequest `event=up`（gateway-bridge） | ✅ |
+| JoinAccept `event=ack`（NS 下行） | ✅ |
+| ChirpStack `event/join` 发布 | ✅ |
+| 上行包 3/3 `OK+SENT:00` | ✅ |
+| 下行 RX_1 收到 ADR 命令（包 2、3） | ✅ RSSI=-64 dBm，SNR=10 dB |
+| ADR 收敛（第 2 包起 DR5） | ✅ |
+| Confirmed 模式 8 包全 `+EVT:SEND_CONFIRMED` | ✅ |
+| `TX errors: 0`（网关统计） | ✅ |
+
+详细过程见 [test_pkt_fwd_otaa_e2e_memo.md](../archive/test_notes/test_pkt_fwd_otaa_e2e_memo.md)。
 
 ---
 

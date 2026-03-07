@@ -685,6 +685,7 @@ static int parse_SX130x_configuration(const char * conf_array) {
         if (json_value_get_type(val) == JSONBoolean) {
             tx_enable[i] = (bool)json_value_get_boolean(val);
         }
+        rfconf.tx_enable = tx_enable[i]; /* propagate to HAL context (fix: was always false) */
         if (tx_enable[i] == true) {
             tx_freq_min[i] = (unsigned int)json_object_get_number(conf_obj, "tx_freq_min");
             tx_freq_max[i] = (unsigned int)json_object_get_number(conf_obj, "tx_freq_max");
