@@ -19,6 +19,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 
 #include "config.h"
 #include "driver/i2c.h"
+#include "board_config.h"
 
 
 #define LGW_I2C_SUCCESS      0
@@ -30,11 +31,11 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #define NACK_VAL           0x1      /* I2C nack value */
 
 #ifndef I2C_MASTER_SCL_IO
-#define I2C_MASTER_SCL_IO   22      /* gpio number for I2C master clock */
+#define I2C_MASTER_SCL_IO   5       /* gpio number for I2C master clock */
 #endif
 
 #ifndef I2C_MASTER_SDA_IO
-#define I2C_MASTER_SDA_IO   21      /* gpio number for I2C master data  */
+#define I2C_MASTER_SDA_IO   4       /* gpio number for I2C master data  */
 #endif
 
 #define I2C_MASTER_NUM       0      /* I2C port number for master dev */
@@ -74,6 +75,15 @@ esp_err_t i2c_esp32_read(uint8_t device_addr, uint8_t reg_addr, uint8_t *data);
 @return 0 if I2C data write is successful, -1 else
 */
 esp_err_t i2c_esp32_write(uint8_t device_addr, uint8_t reg_addr, uint8_t data);
+
+/**
+@brief Read two bytes from an I2C port (for 16-bit register reads)
+@param device_addr  I2C device address
+@param reg_addr     Address of the register to be read
+@param data         Pointer to a 2-byte buffer to store read data (MSB first)
+@return 0 if I2C data read is successful, -1 else
+*/
+esp_err_t i2c_esp32_read_word(uint8_t device_addr, uint8_t reg_addr, uint8_t *data);
 
 /**
 @brief Write a raw buffer to an I2C port

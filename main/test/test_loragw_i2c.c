@@ -28,33 +28,24 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #include <time.h>
 
 #include "loragw_i2c.h"
-#include "loragw_stts751.h"
+#include "loragw_lm75a.h"
 #include "loragw_aux.h"
 #include "loragw_hal.h"
 
 
-#define STTS751_REG_TEMP_H      0x00
-#define STTS751_REG_TEMP_L      0x02
-#define STTS751_REG_CONF        0x03
-#define STTS751_REG_RATE        0x04
-#define STTS751_REG_PROD_ID     0xFD
-#define STTS751_REG_MAN_ID      0xFE
-#define STTS751_REG_REV_ID      0xFF
-
-#define STTS751_0_PROD_ID       0x00
-#define STTS751_1_PROD_ID       0x01
-#define ST_MAN_ID               0x53
+#define LM75A_REG_TEMP          0x00
+#define LM75A_REG_CONF          0x01
+#define LM75A_I2C_ADDR          0x48    /* LM75A default 7-bit address (A2=A1=A0=0) */
 
 
 void app_main(void)
 {
     int i, err;
     uint8_t val;
-    uint8_t high_byte, low_byte;
-    int8_t h;
+    uint8_t buf[2];
     float temperature;
 
-    printf( "+++ Start of I2C test program +++\n" );
+    printf( "+++ Start of I2C test program (LM75A) +++\n" );
 
     // I've two choices to skip when something goes wrong before the 'for()' loop:
     //   1. use 'goto'.
@@ -69,89 +60,37 @@ void app_main(void)
         goto out;
     }
 
-    /* Get temperature sensor product ID */
-    err = i2c_esp32_read(I2C_PORT_STTS751, STTS751_REG_PROD_ID, &val);
+    /* Read LM75A configuration register to verify device is present */
+    err = i2c_esp32_read(LM75A_I2C_ADDR, LM75A_REG_CONF, &val);
     if ( err != 0 )
     {
-        printf( "ERROR: failed to read I2C device 0x%x (err=%i)\n", I2C_PORT_STTS751, err );
+        printf( "ERROR: failed to read I2C device 0x%x (err=%i)\n", LM75A_I2C_ADDR, err );
         goto out;
     }
-    switch( val )
-    {
-        case STTS751_0_PROD_ID:
-            printf("INFO: Product ID: STTS751-0\n");
-            break;
-        case STTS751_1_PROD_ID:
-            printf("INFO: Product ID: STTS751-1\n");
-            break;
-        default:
-            printf("ERROR: Product ID: UNKNOWN\n");
-            goto out;
-    }
+    printf("INFO: LM75A config register: 0x%02X\n", val);
 
-    /* Get temperature sensor  Manufacturer ID */
-    err = i2c_esp32_read(I2C_PORT_STTS751, STTS751_REG_MAN_ID, &val );
+    /* Configure LM75A: normal mode, OS comparator, active-low */
+    err = i2c_esp32_write(LM75A_I2C_ADDR, LM75A_REG_CONF, 0x00);
     if ( err != 0 )
     {
-        printf( "ERROR: failed to read I2C device 0x%x (err=%i)\n", I2C_PORT_STTS751, err );
-        goto out;
-    }
-    if ( val != ST_MAN_ID )
-    {
-        printf( "ERROR: Manufacturer ID: UNKNOWN\n" );
-        goto out;
-    }
-    else
-    {
-        printf("INFO: Manufacturer ID: 0x%02X\n", val);
-    }
-
-    /* Get temperature sensor  revision number */
-    err = i2c_esp32_read(I2C_PORT_STTS751, STTS751_REG_REV_ID, &val);
-    if ( err != 0 )
-    {
-        printf( "ERROR: failed to read I2C device 0x%x (err=%i)\n", I2C_PORT_STTS751, err );
-        goto out;
-    }
-    printf("INFO: Revision number: 0x%02X\n", val);
-
-    /* Set conversion resolution to 12 bits */
-    err = i2c_esp32_write(I2C_PORT_STTS751, STTS751_REG_CONF, 0x8C); /* TODO: do not hardcode the whole byte */
-    if ( err != 0 )
-    {
-        printf( "ERROR: failed to write I2C device 0x%02X (err=%i)\n", I2C_PORT_STTS751, err );
-        goto out;
-    }
-
-    /* Set conversion rate to 1 / second */
-    err = i2c_esp32_write(I2C_PORT_STTS751, STTS751_REG_RATE, 0x04);
-    if ( err != 0 )
-    {
-        printf( "ERROR: failed to write I2C device 0x%02X (err=%i)\n", I2C_PORT_STTS751, err );
+        printf( "ERROR: failed to write I2C device 0x%02X (err=%i)\n", LM75A_I2C_ADDR, err );
         goto out;
     }
 
     for(i=0; i<100; i++) {
-        /* Read Temperature LSB */
-        err = i2c_esp32_read(I2C_PORT_STTS751, STTS751_REG_TEMP_L, &low_byte);
+        /* Read Temperature (2 bytes from register 0x00) */
+        err = i2c_esp32_read_word(LM75A_I2C_ADDR, LM75A_REG_TEMP, buf);
         if ( err != 0 )
         {
-            printf( "ERROR: failed to read I2C device 0x%02X (err=%i)\n", I2C_PORT_STTS751, err );
+            printf( "ERROR: failed to read I2C device 0x%02X (err=%i)\n", LM75A_I2C_ADDR, err );
             break;
         }
 
-        /* Read Temperature MSB */
-        err = i2c_esp32_read(I2C_PORT_STTS751, STTS751_REG_TEMP_H, &high_byte);
-        if ( err != 0 )
-        {
-            printf( "ERROR: failed to read I2C device 0x%02X (err=%i)\n", I2C_PORT_STTS751, err );
-            break;
-        }
+        /* LM75A: 11-bit signed value, resolution 0.125°C */
+        int16_t raw = (int16_t)((buf[0] << 8) | buf[1]);
+        temperature = raw / 256.0f;
 
-        h = (int8_t)high_byte;
-        temperature =  ((h << 8) | low_byte) / 256.0;
-
-        printf( "Temperature: %f C (h:0x%02X l:0x%02X)\n", temperature, high_byte, low_byte );
+        printf( "Temperature: %f C (h:0x%02X l:0x%02X)\n", temperature, buf[0], buf[1] );
         wait_ms( 1000 );
     }
 

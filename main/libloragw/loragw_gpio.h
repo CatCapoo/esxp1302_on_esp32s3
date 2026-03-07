@@ -17,6 +17,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 
 
 #include "driver/gpio.h"
+#include "board_config.h"
 
 #ifndef SX1302_RESET_PIN
 #define SX1302_RESET_PIN          2
