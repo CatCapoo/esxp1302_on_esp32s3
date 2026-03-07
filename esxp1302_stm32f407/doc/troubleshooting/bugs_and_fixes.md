@@ -177,3 +177,33 @@
 | B13 | 串口识别 | 测试 | 低 |
 | B14 | SyncWord 不匹配 | 测试 | 高 |
 | B15 | CRC/IQ 不匹配 | 测试 | 高 |
+| B16 | stat 时间戳格式错误 | 集成 | **致命** |
+| B17 | 链接脚本未保护配置扇区 | 工程 | 高 |
+
+---
+
+## 阶段五：ChirpStack 集成
+
+### B16 — stat 时间戳格式导致网关永不上线
+
+| 项目 | 内容 |
+|------|------|
+| 阶段 | 集成测试 |
+| 现象 | 网关 UDP PULL_ACK 100% 正常，ChirpStack 中网关始终离线（never seen） |
+| 定位 | `docker logs chirpstack-gateway-bridge` 中每 30 秒出现一条 error：`parsing time "\"00:00:36\"" as "\"2006-01-02 15:04:05 MST\""` |
+| 根因 | `lora_pkt_fwd.c` 的 stat JSON `time` 字段格式为 `"00:00:36"`（设备运行时长），ChirpStack Gateway Bridge 要求 `"YYYY-MM-DD HH:MM:SS TZD"` 格式，解析失败后直接丢弃整个 PUSH_DATA 报文 |
+| 修复 | `snprintf(stat_timestamp, ..., "2000-01-01 %02lu:%02lu:%02lu GMT", h, m, s)`；缓冲区 24→32 字节 |
+| 影响 | 修复后 Gateway Bridge 立即发布 `event/stats` 到 MQTT，网关上线 |
+| 文件 | `packet_forwarder/lora_pkt_fwd.c` |
+| 详见 | [testing/08_chirpstack_gateway_online_test.md](../testing/08_chirpstack_gateway_online_test.md) |
+
+### B17 — 链接脚本未保护配置扇区
+
+| 项目 | 内容 |
+|------|------|
+| 阶段 | 工程设计 |
+| 现象 | 当前无影响；潜在风险：固件增长超过 896KB 时链接器会把代码放入 Sector 11（`0x080E0000`），覆盖 Flash 配置数据 |
+| 根因 | `STM32F407ZGTx_FLASH_cmake.ld` 中 `FLASH LENGTH = 1024K`，覆盖了配置存储区 |
+| 修复 | `FLASH LENGTH = 896K`（Sectors 0-10），Sector 11 不再属于可链接区域；固件超限时链接器报错而非静默覆盖 |
+| 文件 | `STM32F407ZGTx_FLASH_cmake.ld` |
+| 详见 | [impl/06_freq_plan_flash_config_v4.md](../impl/06_freq_plan_flash_config_v4.md#part-4链接脚本-flash-区域保护) |

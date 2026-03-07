@@ -22,6 +22,8 @@
 | 6 | [testing/02_hal_rx_test.md](testing/02_hal_rx_test.md) | HAL RX 测试（含 E77 节点配置） |
 | 7 | [testing/03_hal_tx_test.md](testing/03_hal_tx_test.md) | HAL TX 测试（含 SX1278 接收配置） |
 | 随用 | [testing/04_scripts_reference.md](testing/04_scripts_reference.md) | Python 测试脚本用法手册 |
+| 8 | [impl/06_freq_plan_flash_config_v4.md](impl/06_freq_plan_flash_config_v4.md) | 多区域频率计划、Flash 配置 v4、UART CLI 频率命令 |
+| 9 | [testing/08_chirpstack_gateway_online_test.md](testing/08_chirpstack_gateway_online_test.md) | ChirpStack 网关上线调试与 stat 时间戳 Bug 修复 |
 
 ---
 
@@ -35,12 +37,14 @@
 - [impl/05_cross_platform_config.md](impl/05_cross_platform_config.md) — 跨平台构建配置（STM32_CLT_PATH 环境变量方案）
 - [impl/02_platform_adapt.md](impl/02_platform_adapt.md) — 平台适配速查表
 - [impl/03_driver_layers.md](impl/03_driver_layers.md) — 源文件依赖关系
+- [impl/06_freq_plan_flash_config_v4.md](impl/06_freq_plan_flash_config_v4.md) — 多区域频率计划预设、Flash 配置 v4、UART CLI 频率命令
 
 ### 测试流程 / 脚本
 - [testing/01_bringup_tests.md](testing/01_bringup_tests.md) — 底层外设测试
 - [testing/02_hal_rx_test.md](testing/02_hal_rx_test.md) — 网关收包测试
 - [testing/03_hal_tx_test.md](testing/03_hal_tx_test.md) — 网关发包测试
 - [testing/04_scripts_reference.md](testing/04_scripts_reference.md) — E77 脚本
+- [testing/08_chirpstack_gateway_online_test.md](testing/08_chirpstack_gateway_online_test.md) — ChirpStack 网关上线调试（stat 时间戳 Bug）
 
 ### 背景知识
 - [learning/01_sx1302_architecture.md](learning/01_sx1302_architecture.md) — SX1302 架构
