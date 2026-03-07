@@ -99,10 +99,10 @@ int main(void)
   MX_I2C2_Init();
   MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
-  /* 启动 TIM2 微秒计时�???? */
+  /* 启动 TIM2 微秒定时器 */
   HAL_TIM_Base_Start(&htim2);
 
-  /* 串口打印 */
+  /* 发送启动信息 */
   const char *msg = "ESXP1302 on STM32F407 - SPI Test Ready\r\n";
   HAL_UART_Transmit(&huart1, (uint8_t *)msg, strlen(msg), 100);
   /* USER CODE END 2 */
