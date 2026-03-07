@@ -265,31 +265,47 @@ FreeRTOS Cortex-M 规则：
 
 ## Part 4：CH340 自动复位与 pyserial 测试
 
-### 4.1 CH340 DTR→NRST 电路工作原理
+### 4.1 CH340 一键下载电路工作原理
+
+正点原子 STM32F407 最小系统板的 CH340C **同时控制两个信号**：
 
 ```
-USB-UART（CH340）
-  DTR ──[100nF]──┬─ STM32 NRST
-                 └─ 10kΩ ── VCC
+CH340C DTR# ──(反相)── DTR_N ──> Q1 (NPN) ──> NRST   (复位)
+CH340C RTS# ──(反相)── RTS_N ──> Q2 (PNP) ──> BOOT0  (启动模式)
 ```
 
-电容微分：DTR 信号的**边沿变化**（低→高）产生短脉冲传到 NRST = **MCU 复位**。
+| 软件操作 | MCU 效果 |
+|---------|---------|
+| DTR raised (assert) | Q1 OFF → 不复位 |
+| DTR lowered (deassert) | Q1 ON → **NRST LOW → MCU 复位** |
+| RTS raised (assert) | Q2 ON → **BOOT0 HIGH → 进入 Bootloader** |
+| RTS lowered (deassert) | Q2 OFF → BOOT0 LOW → 从 Flash 启动 |
 
-pyserial 默认行为：
+> **关键陷阱**：Linux 打开串口时默认 raise DTR 和 RTS。
+> RTS raised → BOOT0=HIGH，此后任何复位（按键或 `NVIC_SystemReset`）
+> 都会让 MCU 进入 System Bootloader 而非从 Flash 启动！
+> 表现为：LED 停止闪烁、串口无输出、看起来像"死机"。
+
+**picocom 正确用法**：
+```bash
+picocom -b 115200 --lower-rts /dev/ttyUSB0
+```
+
+pyserial 默认行为（**错误**，会导致复位后进入 Bootloader）：
 ```python
 s = serial.Serial('COM11', 115200)
-# 内部先设 DTR=True，再 open()，触发 MCU reset
+# 内部 raise DTR + raise RTS → BOOT0=HIGH
 ```
 
-**正确的打开方式**（必须在 `open()` 之前设 `dtr=False`）：
+**正确的打开方式**（必须在 `open()` 之前设 `dtr=False, rts=False`）：
 ```python
 ser = serial.Serial()
 ser.port     = 'COM11'
 ser.baudrate = 115200
 ser.timeout  = 1
-ser.dtr      = False   # ← open() 之前！
-ser.rts      = False   # 可选
-ser.open()             # 现在 DTR 已是 False，不触发 reset
+ser.dtr      = False   # ← open() 之前！不触发复位
+ser.rts      = False   # ← open() 之前！保持 BOOT0=LOW
+ser.open()             # 现在不复位，也不影响启动模式
 ```
 
 ### 4.2 send() 函数规范

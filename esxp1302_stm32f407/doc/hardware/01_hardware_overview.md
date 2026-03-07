@@ -71,14 +71,51 @@ CubeMX 配置：Standard Mode (100 kHz)。
 | PA9 | USART1_TX |
 | PA10 | USART1_RX |
 
-波特率 115200, 8N1。通过 `__io_putchar()` 重定向 printf 到 USART1：
+波特率 115200, 8N1。通过 `__io_putchar()` 重定向 printf 到 USART1（自动 LF→CRLF）。
 
-```c
-int __io_putchar(int ch)
-{
-    HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
-    return ch;
-}
+### ⚠️ 一键下载电路与串口终端注意事项
+
+正点原子 STM32F407 最小系统板板载 **一键下载电路**（Q1 + Q2 晶体管），CH340C 的 DTR/RTS 信号通过该电路分别控制 MCU 的 **NRST（复位）** 和 **BOOT0（启动模式选择）**：
+
+```
+CH340C DTR# ──(反相)── DTR_N ──> Q1 (NPN) ──> NRST    (复位)
+CH340C RTS# ──(反相)── RTS_N ──> Q2 (PNP) ──> BOOT0   (启动模式)
+```
+
+**信号逻辑表：**
+
+| 软件操作 | CH340 引脚 | PCB 信号 | 晶体管 | MCU 效果 |
+|---------|-----------|---------|-------|---------|
+| DTR raised (assert) | DTR# = LOW | DTR_N = LOW | Q1 OFF | NRST 不被拉低，正常运行 |
+| DTR lowered (deassert) | DTR# = HIGH | DTR_N = HIGH | Q1 ON | **NRST = LOW → MCU 复位** |
+| RTS raised (assert) | RTS# = LOW | RTS_N = LOW | Q2 ON | **BOOT0 = HIGH → 进入 Bootloader** |
+| RTS lowered (deassert) | RTS# = HIGH | RTS_N = HIGH | Q2 OFF | BOOT0 = LOW（被下拉电阻保持），从 Flash 启动 |
+
+**关键问题：** Linux 打开串口时默认 raise DTR 和 RTS。RTS 被 raise 后 Q2 导通使 BOOT0=HIGH。此时 MCU 虽然正常运行（BOOT0 仅在复位时采样），但**一旦发生任何复位事件**（按复位键、CLI `reboot` 命令），MCU 会采样到 BOOT0=HIGH，进入 System Bootloader 而非从 Flash 启动，表现为 LED 停止闪烁、串口无输出。
+
+**正确的串口终端命令：**
+
+```bash
+# ✅ 正确：--lower-rts 确保 BOOT0 保持 LOW
+picocom -b 115200 --lower-rts /dev/ttyUSB0
+
+# ❌ 错误：默认 raise RTS → 复位后进入 Bootloader
+picocom -b 115200 /dev/ttyUSB0
+
+# ❌ 错误：--lower-dtr → 持续拉低 NRST → MCU 被钉在复位状态
+picocom -b 115200 --lower-dtr /dev/ttyUSB0
+```
+
+**pyserial 正确打开方式：**
+
+```python
+import serial
+ser = serial.Serial()
+ser.port     = '/dev/ttyUSB0'
+ser.baudrate = 115200
+ser.dtr      = False   # 不触发复位
+ser.rts      = False   # 不拉高 BOOT0
+ser.open()
 ```
 
 ## TIM2 — 微秒定时器
