@@ -198,16 +198,28 @@ void oled_fill(void)
 
 void oled_refresh(void)
 {
+    int err = 0;
+
     /* Set full-screen address window */
-    oled_cmd(0x21); oled_cmd(0x00); oled_cmd(0x7F);   /* col  0–127 */
-    oled_cmd(0x22); oled_cmd(0x00); oled_cmd(0x07);   /* page 0–7   */
+    err |= oled_cmd(0x21); err |= oled_cmd(0x00); err |= oled_cmd(0x7F);   /* col  0–127 */
+    err |= oled_cmd(0x22); err |= oled_cmd(0x00); err |= oled_cmd(0x07);   /* page 0–7   */
 
     /* Build transmission buffer: [0x40 | framebuffer data] */
     tx_data[0] = 0x40;
     for (int p = 0; p < OLED_PAGES; p++) {
         memcpy(&tx_data[1 + p * OLED_WIDTH], framebuf[p], OLED_WIDTH);
     }
-    lgw_i2c_write_buf(OLED_I2C_ADDR, tx_data, sizeof tx_data);
+    err |= lgw_i2c_write_buf(OLED_I2C_ADDR, tx_data, sizeof tx_data);
+
+    /* --- TEMPORARY DIAGNOSTIC --- */
+    if (err != 0) {
+        static uint32_t oled_err_cnt = 0;
+        oled_err_cnt++;
+        if (oled_err_cnt <= 10) {
+            printf("[OLED] ERR: refresh failed (#%lu)\r\n",
+                   (unsigned long)oled_err_cnt);
+        }
+    }
 }
 
 void oled_set_pixel(uint8_t x, uint8_t y, uint8_t val)

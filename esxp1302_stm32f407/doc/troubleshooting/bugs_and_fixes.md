@@ -258,3 +258,57 @@ if (lgw_rxrf_setconf(i, rfconf) != LGW_HAL_SUCCESS) { ... }
 | 文件 | `scripts/e77_node_ctrl.py` |
 | 副作用 | `restore()` 会将 DevEUI 恢复为出厂值（`0080E11506A99424`），但随即被 `AT+CDEVEUI=AABBCCDD11223344` 覆盖，无影响 |
 | 修复验证 | 修复后连续三次运行 `otaa` 子命令，每次全部 AT 指令均返回 `OK`，无警告 |
+
+---
+
+## 阶段七：SNTP 集成后 OLED 时间显示
+
+### B20 — OLED Row 6 时间永久空白（多根因复合）
+
+| 项目 | 内容 |
+|------|------|
+| 阶段 | SNTP 功能集成后（2026-03-08） |
+| 现象 | 复位后 OLED 第 6 行始终空白，不显示 `Up HH:MM:SS` 也不显示 UTC 时间；串口 SNTP 同步成功、`stat_timestamp` 字符串正确；**间歇性**（约 30–60% 复位触发） |
+| 根因 | 4 个独立根因复合，需同时修复（见下） |
+| 严重度 | 高（OLED 时间显示完全失效） |
+| 详见 | [impl/08_oled_display_bug.md](../impl/08_oled_display_bug.md) |
+
+**根因 1 — 主循环入口前 5 秒空白窗口**
+
+| 项目 | 内容 |
+|------|------|
+| 原因 | 启动屏 `oled_show_one_line(0, 5, ...)` 调用 `oled_refresh()` 将全零 Row 6 推送到屏幕；主循环有 `vTaskDelay(5s)` 才首次更新 Row 6 |
+| 修复 | 在主循环入口前立即写一次 Row 6 运行时长字符串 |
+| 文件 | `packet_forwarder/lora_pkt_fwd.c` |
+
+**根因 2 — I2C 超时裕量不足 → HAL_TIMEOUT**
+
+| 项目 | 内容 |
+|------|------|
+| 原因 | 1025 字节 OLED 刷新 ≈ 92ms，超时设为 100ms（仅 8ms 裕量）；FreeRTOS `thread_up`（AboveNormal）抢占期间消耗超时裕量 |
+| 修复 | 动态超时 `= I2C_TIMEOUT_MS + size/5`；1025 字节 → 305ms |
+| 文件 | `libloragw/loragw_i2c.c` |
+
+**根因 3 — STM32F4 I2C Errata ES0182：BUSY 标志锁死**
+
+| 项目 | 内容 |
+|------|------|
+| 原因 | `lgw_start()` 向 4 个 LM75A 地址（0x48–0x4B）发 I2C 探测，板上无传感器，全部 NACK；依 Errata ES0182，特定 NACK 时序使 `I2C_SR2.BUSY` 位永久置 1；此后所有 `HAL_I2C_*` 调用立即返回 `HAL_BUSY`，不发出任何 I2C 信号 |
+| 修复 | 检测到 `HAL_BUSY`/`HAL_TIMEOUT` 时执行 `HAL_I2C_DeInit()` + `HAL_I2C_Init()` + 重试（ST 官方推荐 workaround） |
+| 文件 | `libloragw/loragw_i2c.c` |
+
+**根因 4 — I2C2 总线无 FreeRTOS Mutex**
+
+| 项目 | 内容 |
+|------|------|
+| 原因 | `thread_up`（AboveNormal）调用链 `lgw_receive()` → `lgw_get_temperature()` → `lgw_i2c_read()`；主任务 `oled_refresh()` → `lgw_i2c_write_buf()`；两者共用 `hi2c2`；STM32 HAL `__HAL_LOCK()` 非原子，FreeRTOS 抢占下不安全 |
+| 修复 | 添加 `SemaphoreHandle_t s_i2c_mtx = xSemaphoreCreateMutex()`，所有 I2C 调用前后 `xSemaphoreTake/Give(portMAX_DELAY)` |
+| 文件 | `libloragw/loragw_i2c.c` |
+
+**根因 5（辅助）— oled_refresh() void 返回沉默失败**
+
+| 项目 | 内容 |
+|------|------|
+| 原因 | `void oled_refresh()` 丢弃所有 I2C 返回值，失败完全不可见，导致上述根因长时间未被发现 |
+| 修复 | `int err = 0; err |= ...` 累积模式；失败时打印 `[OLED] ERR: refresh failed (#N)`（最多 10 次） |
+| 文件 | `libloragw/loragw_oled.c` |
