@@ -122,7 +122,8 @@ const uint8_t ifmod_config[LGW_IF_CHAIN_NB] = LGW_IFMODEM_CONFIG;
 #include "cal_fw.var" /* text_cal_sx1257_16_Nov_1 */
 
 /* Buffer to hold RX data */
-rx_buffer_t rx_buffer;
+/* Placed in CCMRAM (SPI is polling mode, no DMA): saves ~4 KB in SRAM */
+rx_buffer_t rx_buffer __attribute__((section(".ccmram")));
 
 /* Internal timestamp counter */
 timestamp_counter_t counter_us;

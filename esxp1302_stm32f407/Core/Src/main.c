@@ -31,6 +31,12 @@
 #include <string.h>
 /* USER CODE END Includes */
 
+/* USER CODE BEGIN ETM */
+/* CCMRAM section boundaries — defined in linker script */
+extern uint32_t _sccmram;
+extern uint32_t _eccmram;
+/* USER CODE END ETM */
+
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
@@ -70,7 +76,13 @@ void MX_FREERTOS_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+  /* Zero-fill CCMRAM (.ccmram section) before any C code runs.
+   * The startup file only clears .bss (SRAM); CCMRAM must be cleared
+   * explicitly. Placed here so it survives CubeMX code regeneration. */
+  {
+    uint32_t *p = &_sccmram;
+    while (p < &_eccmram) { *p++ = 0; }
+  }
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/

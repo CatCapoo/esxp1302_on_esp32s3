@@ -248,7 +248,8 @@ static unsigned int autoquit_threshold = 0;
 static unsigned int autoquit_cnt = 0;
 
 /* Just In Time TX scheduling */
-static struct jit_queue_s jit_queue[LGW_RF_CHAIN_NB];
+/* Placed in CCMRAM (CPU-only, no DMA): saves ~19 KB in SRAM */
+static struct jit_queue_s jit_queue[LGW_RF_CHAIN_NB] __attribute__((section(".ccmram")));
 
 /* Gateway specificities */
 static int8_t antenna_gain = 0;
@@ -263,7 +264,8 @@ static unsigned int nb_pkt_log[LGW_IF_CHAIN_NB][8];
 static unsigned int nb_pkt_received_lora = 0;
 static unsigned int nb_pkt_received_fsk = 0;
 
-static struct lgw_conf_debug_s debugconf;
+/* Placed in CCMRAM (CPU-only, no DMA): saves ~4 KB in SRAM */
+static struct lgw_conf_debug_s debugconf __attribute__((section(".ccmram")));
 static unsigned int nb_pkt_received_ref[16];
 
 /* Interface type */
