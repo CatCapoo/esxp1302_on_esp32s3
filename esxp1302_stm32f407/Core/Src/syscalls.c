@@ -154,3 +154,7 @@ int _execve(char *name, char **argv, char **env)
 	errno = ENOMEM;
 	return -1;
 }
+
+/* NOTE: _gettimeofday is now implemented in sntp_gettimeofday.c
+ * to prevent CubeMX from overwriting it during code regeneration.
+ * That file must be linked BEFORE syscalls.c (or syscalls.o). */

@@ -8,3 +8,5 @@ esxp1302_stm32f407/build/
 # CubeMX IDE backup files
 .cproject.bak
 .project.bak
+_ref_bringup_test/
+esxp1302_stm32f407/_ref_bringup_test/

@@ -17,7 +17,8 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
     - BSD sockets → net_transport (W5500 UDP)
     - ESP-IDF / lwip → FreeRTOS (CMSIS-RTOS v2 wrappers)
     - NVS config → gateway_config (Flash Sector 11)
-    - WiFi/MQTT/HTTP/NTP → removed
+    - WiFi/MQTT/HTTP → removed
+    - NTP → sntp_client (W5500 UDP, replaces esp_sntp)
     - GPS → disabled (#define GPS_ENABLE 0)
     - OLED → STM32 I2C SSD1306 driver (loragw_oled)
 */
@@ -70,6 +71,9 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 #include "gateway_config.h"
 #include "uart_cli.h"
 #include "gw_config_presets.h"
+
+/* SNTP time synchronisation (replaces ESP-IDF esp_sntp) */
+#include "sntp_client.h"
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                   */
@@ -2067,7 +2071,7 @@ int pkt_fwd_main(void)
     /* statistics */
     float rx_ok_ratio, rx_bad_ratio, rx_nocrc_ratio;
     float up_ack_ratio, dw_ack_ratio;
-    char stat_timestamp[32];
+    char stat_timestamp[32] = "";
     unsigned int time_count = 0;
 
     /* GPS placeholder */
@@ -2243,6 +2247,13 @@ int pkt_fwd_main(void)
     MSG("INFO: UDP sockets opened, NS=%d.%d.%d.%d up:%u down:%u\n",
         ns_ip[0], ns_ip[1], ns_ip[2], ns_ip[3], ns_port_up, ns_port_down);
 
+    /* ============== SNTP Time Synchronisation ============== */
+    /* Mirrors ESP-IDF esp_sntp_init() async design from bringup/test branch.
+     * Starts a background FreeRTOS task (tskIDLE_PRIORITY+1) that tries
+     * the local gateway first (ARP-guaranteed), then falls back to public NTP.
+     * Non-blocking — packet forwarder starts immediately. */
+    sntp_task_start(cfg->eth_gw, cfg->eth_ip, ns_ip);
+
     /* ============== Board Reset & Start Concentrator ============== */
     lgw_reset();
 
@@ -2307,10 +2318,22 @@ int pkt_fwd_main(void)
         oled_draw_string(0, 3, out_info);
         oled_draw_string(0, 4, "Concentrator OK ");
     }
-    /* Update NS info on OLED — oled_show_one_line flushes the entire display */
+    /* Update NS info on OLED */
     snprintf(out_info, sizeof out_info, "NS=%d.%d.%d.%d:%u",
              ns_ip[0], ns_ip[1], ns_ip[2], ns_ip[3], ns_port_up);
     oled_show_one_line(0, 5, out_info);
+
+    /* Show initial uptime on OLED row 6 immediately so it's never blank.
+     * Without this, row 6 stays empty for the first TIME_REFRESH seconds
+     * (5 s) after boot — the user sees neither "Up" nor a UTC timestamp. */
+    {
+        uint32_t up = get_uptime_sec();
+        snprintf(stat_timestamp, sizeof stat_timestamp, "Up %02lu:%02lu:%02lu",
+                 (unsigned long)(up / 3600),
+                 (unsigned long)((up % 3600) / 60),
+                 (unsigned long)(up % 60));
+        oled_show_one_line(0, 6, stat_timestamp);
+    }
 
     /* ============== Main Loop: Statistics Collection ============== */
     while (!exit_sig && !quit_sig) {
@@ -2319,13 +2342,43 @@ int pkt_fwd_main(void)
             vTaskDelay(pdMS_TO_TICKS(1000 * TIME_REFRESH));
             time_count += TIME_REFRESH;
 
-            /* Update time display on OLED */
-            uint32_t up = get_uptime_sec();
-            snprintf(stat_timestamp, sizeof stat_timestamp, "Up %02lu:%02lu:%02lu",
-                     (unsigned long)(up / 3600),
-                     (unsigned long)((up % 3600) / 60),
-                     (unsigned long)(up % 60));
-            oled_show_one_line(0, 6, stat_timestamp);
+            /* Update time display on OLED — real UTC time (like ESP32 reference)
+             * Falls back to uptime if SNTP has not synced yet.
+             * NOTE: gmtime_r is used instead of gmtime for FreeRTOS thread safety
+             * (the SNTP background task also calls gmtime). */
+            {
+                time_t t = time(NULL);
+                bool shown = false;
+                if (t > 1700000000) { /* valid date (after ~2023) */
+                    struct tm tm_buf;
+                    struct tm *tm_ptr = gmtime_r(&t, &tm_buf);
+                    if (tm_ptr != NULL &&
+                        strftime(stat_timestamp, sizeof stat_timestamp,
+                                 "%Y-%m-%d %H:%M:%S Z", tm_ptr) > 0) {
+                        shown = true;
+                    }
+                }
+                if (!shown) {
+                    uint32_t up = get_uptime_sec();
+                    snprintf(stat_timestamp, sizeof stat_timestamp, "Up %02lu:%02lu:%02lu",
+                             (unsigned long)(up / 3600),
+                             (unsigned long)((up % 3600) / 60),
+                             (unsigned long)(up % 60));
+                }
+                oled_show_one_line(0, 6, stat_timestamp);
+
+                /* --- TEMPORARY DIAGNOSTIC --- */
+                {
+                    static uint32_t r6_cnt = 0;
+                    r6_cnt++;
+                    if (r6_cnt <= 3 || (r6_cnt % 6) == 0) {
+                        printf("[OLED-DBG] Row6 #%lu: \"%s\"\r\n",
+                               (unsigned long)r6_cnt, stat_timestamp);
+                    }
+                }
+            }
+
+            /* SNTP re-sync is handled by the sntp_background_task (non-blocking) */
         }
 
         /* access upstream statistics, copy and reset */
@@ -2395,9 +2448,18 @@ int pkt_fwd_main(void)
         dw_ack_ratio = (cp_dw_pull_sent > 0) ? (float)cp_dw_ack_rcv / (float)cp_dw_pull_sent : 0.0;
 
         /* display report */
-        uint32_t up = get_uptime_sec();
-        printf("\n##### Uptime %02lu:%02lu:%02lu #####\n",
-               (unsigned long)(up / 3600), (unsigned long)((up % 3600) / 60), (unsigned long)(up % 60));
+        {
+            time_t t = time(NULL);
+            struct tm tm_buf;
+            if (t > 1700000000 && gmtime_r(&t, &tm_buf) != NULL &&
+                strftime(stat_timestamp, sizeof stat_timestamp, "%Y-%m-%d %H:%M:%S UTC", &tm_buf) > 0) {
+                printf("\n##### %s #####\n", stat_timestamp);
+            } else {
+                uint32_t up = get_uptime_sec();
+                printf("\n##### Uptime %02lu:%02lu:%02lu #####\n",
+                       (unsigned long)(up / 3600), (unsigned long)((up % 3600) / 60), (unsigned long)(up % 60));
+            }
+        }
         printf("### [UPSTREAM] ###\n");
         printf("# RF packets received by concentrator: %u\n", cp_nb_rx_rcv);
         printf("# CRC_OK: %.2f%%, CRC_FAIL: %.2f%%, NO_CRC: %.2f%%\n", 100.0 * rx_ok_ratio, 100.0 * rx_bad_ratio, 100.0 * rx_nocrc_ratio);
@@ -2445,9 +2507,18 @@ int pkt_fwd_main(void)
 
         /* generate JSON status report */
         xSemaphoreTake(mx_stat_rep, portMAX_DELAY);
-        up = get_uptime_sec();
-        snprintf(stat_timestamp, sizeof stat_timestamp, "2000-01-01 %02lu:%02lu:%02lu GMT",
-                 (unsigned long)(up / 3600), (unsigned long)((up % 3600) / 60), (unsigned long)(up % 60));
+        {
+            time_t t = time(NULL);
+            struct tm tm_buf;
+            if (t > 1700000000 && gmtime_r(&t, &tm_buf) != NULL &&
+                strftime(stat_timestamp, sizeof stat_timestamp, "%Y-%m-%d %H:%M:%S GMT", &tm_buf) > 0) {
+                /* ok */
+            } else {
+                uint32_t up = get_uptime_sec();
+                snprintf(stat_timestamp, sizeof stat_timestamp, "2000-01-01 %02lu:%02lu:%02lu GMT",
+                         (unsigned long)(up / 3600), (unsigned long)((up % 3600) / 60), (unsigned long)(up % 60));
+            }
+        }
         if (gps_fake_enable == true) {
             snprintf(status_report, STATUS_SIZE,
                 "\"stat\":{\"time\":\"%s\",\"lati\":%.5f,\"long\":%.5f,\"alti\":%i,\"rxnb\":%u,\"rxok\":%u,\"rxfw\":%u,\"ackr\":%.1f,\"dwnb\":%u,\"txnb\":%u,\"temp\":%.1f}",

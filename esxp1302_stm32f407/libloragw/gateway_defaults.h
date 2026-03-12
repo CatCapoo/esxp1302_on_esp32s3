@@ -50,7 +50,7 @@
  * Currently only static IP is supported.
  */
 #define GW_DEFAULT_ETH_IP           {192, 168, 71,  110}
-#define GW_DEFAULT_ETH_GW           {192, 168, 10,   1}
+#define GW_DEFAULT_ETH_GW           {192, 168, 71,   1}
 #define GW_DEFAULT_ETH_SN           {255, 255, 255,  0}
 #define GW_DEFAULT_ETH_DNS          {  8,   8,   8,  8}
 

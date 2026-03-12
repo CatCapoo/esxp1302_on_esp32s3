@@ -24,6 +24,9 @@
 | 随用 | [testing/04_scripts_reference.md](testing/04_scripts_reference.md) | Python 测试脚本用法手册 |
 | 8 | [impl/06_freq_plan_flash_config_v4.md](impl/06_freq_plan_flash_config_v4.md) | 多区域频率计划、Flash 配置 v4、UART CLI 频率命令 |
 | 9 | [testing/08_chirpstack_gateway_online_test.md](testing/08_chirpstack_gateway_online_test.md) | ChirpStack 网关上线调试与 stat 时间戳 Bug 修复 |
+| 10 | [learning/05_ntp_sntp_concepts.md](learning/05_ntp_sntp_concepts.md) | NTP/SNTP 概念与原理（协议格式、软件时钟模型、Newlib 桥接） |
+| 10.1 | [impl/07_sntp_implementation.md](impl/07_sntp_implementation.md) | SNTP 代码实现剖析（调用链、状态机、5级回退机制） |
+| 10.2 | [impl/07_sntp_configuration.md](impl/07_sntp_configuration.md) | SNTP 功能配置清单（网络、Flash 参数、CMake、CubeMX） |
 
 ---
 
@@ -38,6 +41,8 @@
 - [impl/02_platform_adapt.md](impl/02_platform_adapt.md) — 平台适配速查表
 - [impl/03_driver_layers.md](impl/03_driver_layers.md) — 源文件依赖关系
 - [impl/06_freq_plan_flash_config_v4.md](impl/06_freq_plan_flash_config_v4.md) — 多区域频率计划预设、Flash 配置 v4、UART CLI 频率命令
+- [impl/07_sntp_implementation.md](impl/07_sntp_implementation.md) — SNTP 代码实现剖析（软件时钟、调用链、5级回退、Newlib桥接）
+- [impl/07_sntp_configuration.md](impl/07_sntp_configuration.md) — SNTP 功能配置清单（Flash参数、CMake、CubeMX、网络前提）
 
 ### 测试流程 / 脚本
 - [testing/01_bringup_tests.md](testing/01_bringup_tests.md) — 底层外设测试
@@ -51,6 +56,7 @@
 - [learning/02_lorawan_basics.md](learning/02_lorawan_basics.md) — LoRaWAN / CN470
 - [learning/03_stm32_hal_notes.md](learning/03_stm32_hal_notes.md) — STM32 HAL 注意事项
 - [learning/04_lora_rf_notes.md](learning/04_lora_rf_notes.md) — LoRa RF 参数
+- [learning/05_ntp_sntp_concepts.md](learning/05_ntp_sntp_concepts.md) — NTP/SNTP 概念（协议报文、Unix/NTP纪元、软件时钟模型、Newlib time()）
 
 ### Bug 速查
 - [troubleshooting/bugs_and_fixes.md](troubleshooting/bugs_and_fixes.md) — 全部问题与修复
@@ -81,3 +87,5 @@
 | `test_loragw_hal_tx.c` | HAL TX 测试 | [testing/03](testing/03_hal_tx_test.md) |
 | `scripts/e77_node_tx.py` | E77 节点发包脚本 | [testing/04](testing/04_scripts_reference.md) |
 | `scripts/e77_probe.py` | E77 串口探测脚本 | [testing/04](testing/04_scripts_reference.md) |
+| `sntp_client.c/h` | SNTP 客户端（软件时钟、后台任务、5级回退） | [impl/07](impl/07_sntp_implementation.md) |
+| `sntp_gettimeofday.c` | Newlib `_gettimeofday()` 强符号桥接 | [impl/07](impl/07_sntp_implementation.md) |

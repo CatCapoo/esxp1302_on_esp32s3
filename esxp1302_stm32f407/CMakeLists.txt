@@ -92,6 +92,7 @@ set(PKT_FWD_SOURCES
     packet_forwarder/lora_pkt_fwd.c
     packet_forwarder/jitqueue.c
     packet_forwarder/net_transport.c
+    packet_forwarder/sntp_client.c
     libtools/parson.c
     libtools/base64.c
 )
@@ -119,6 +120,17 @@ set(I2C_SOURCES
 )
 
 # ---------------------------------------------------------------------------
+# Core HAL and syscall sources
+# ---------------------------------------------------------------------------
+set(CORE_SOURCES
+    Core/Src/main.c
+    Core/Src/stm32f4xx_it.c
+    Core/Src/stm32f4xx_hal_msp.c
+    Core/Src/syscalls.c
+    Core/Src/sntp_gettimeofday.c  # Must be linked before syscalls.c to override
+)
+
+# ---------------------------------------------------------------------------
 # W5500 Ethernet sources (WIZnet ioLibrary)
 # ---------------------------------------------------------------------------
 set(W5500_SOURCES
@@ -129,6 +141,7 @@ set(W5500_SOURCES
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+    ${CORE_SOURCES}
     ${LORAGW_SOURCES}
     ${I2C_SOURCES}
     ${W5500_SOURCES}
