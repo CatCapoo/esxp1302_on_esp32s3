@@ -21,8 +21,6 @@ endif()
 # Set the project name
 set(CMAKE_PROJECT_NAME esxp1302_stm32f407)
 
-# Include toolchain file
-include("cmake/gcc-arm-none-eabi.cmake")
 
 # Enable compile command to ease indexing with e.g. clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
@@ -122,12 +120,11 @@ set(I2C_SOURCES
 # ---------------------------------------------------------------------------
 # Core HAL and syscall sources
 # ---------------------------------------------------------------------------
+# NOTE: main.c, stm32f4xx_it.c, stm32f4xx_hal_msp.c, syscalls.c are already
+#       included by cmake/stm32cubemx/CMakeLists.txt (INTERFACE library).
+#       Only list files NOT present in that generated file.
 set(CORE_SOURCES
-    Core/Src/main.c
-    Core/Src/stm32f4xx_it.c
-    Core/Src/stm32f4xx_hal_msp.c
-    Core/Src/syscalls.c
-    Core/Src/sntp_gettimeofday.c  # Must be linked before syscalls.c to override
+    Core/Src/sntp_gettimeofday.c  # Overrides weak _gettimeofday in syscalls.c; keep here only
 )
 
 # ---------------------------------------------------------------------------

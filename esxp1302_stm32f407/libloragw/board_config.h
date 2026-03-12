@@ -3,8 +3,8 @@
  *
  * Matches CubeMX .ioc configuration:
  *   SPI3  PC10/PC11/PC12   (SCK/MISO/MOSI)
- *   NSS   PD2              (software GPIO)
- *   RESET PA8              (GPIO output)
+ *   NSS   PD2  = GPIO_PIN_2  (software GPIO, active-low)
+ *   RESET PA8  = GPIO_PIN_8  (GPIO output, active-high pulse)
  */
 
 #pragma once
@@ -19,14 +19,14 @@
 #define SX1302_SPI_HANDLE     (&hspi3)
 
 /* CS / NSS  –  active low, directly from CubeMX defines */
-#define SX1302_NSS_PORT       SX1302_NSS_GPIO_Port   /* GPIOB */
-#define SX1302_NSS_PIN        SX1302_NSS_Pin          /* GPIO_PIN_12 */
+#define SX1302_NSS_PORT       SX1302_NSS_GPIO_Port   /* GPIOD */
+#define SX1302_NSS_PIN        SX1302_NSS_Pin          /* GPIO_PIN_2 (PD2) */
 
 /* ---------------------------------------------------------------
  * SX1302 control GPIO
  * --------------------------------------------------------------- */
-#define SX1302_RESET_PORT     SX1302_RESET_GPIO_Port  /* GPIOD */
-#define SX1302_RESET_PIN_NUM  SX1302_RESET_Pin        /* GPIO_PIN_9 */
+#define SX1302_RESET_PORT     SX1302_RESET_GPIO_Port  /* GPIOA */
+#define SX1302_RESET_PIN_NUM  SX1302_RESET_Pin        /* GPIO_PIN_8 (PA8) */
 
 /* ---------------------------------------------------------------
  * LEDs  (directly from CubeMX defines)

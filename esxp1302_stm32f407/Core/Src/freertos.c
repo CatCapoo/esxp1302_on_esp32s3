@@ -96,7 +96,7 @@ void MX_FREERTOS_Init(void) {
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* LoRaGW test task â€? needs a large stack for SPI buffers */
+  /* LoRaGW test task ï¿½? needs a large stack for SPI buffers */
   static const osThreadAttr_t testTask_attributes = {
       .name = "testTask",
       .stack_size = 1024 * 8,
