@@ -1,10 +1,8 @@
 # Bug 汇总与修复记录
 
-本文档汇总移植过程中遇到的所有 Bug，按发现阶段排列。
+本文档汇总移植过程中遇到的所有 Bug，按发现时间顺序编号。
 
 ---
-
-## 阶段一: 编译与链接
 
 ### B01 — `_write` / `_read` 等 syscall 缺失
 
@@ -60,8 +58,6 @@
 
 ---
 
-## 阶段二: SPI / SX1250 Bringup
-
 ### B07 — SX1250 GET_STATUS 返回错误值
 
 | 项目 | 内容 |
@@ -83,8 +79,6 @@
 
 ---
 
-## 阶段三: I2C / 传感器
-
 ### B09 — LM75A 温度传感器地址错误
 
 | 项目 | 内容 |
@@ -105,8 +99,6 @@
 
 ---
 
-## 阶段四: HAL 层编译
-
 ### B11 — 固件数组 `const` 限定符不匹配
 
 | 项目 | 内容 |
@@ -126,8 +118,6 @@
 | 修复 | 使用 `#ifndef` 包裹或统一在一个头文件定义 |
 
 ---
-
-## 阶段五: HAL RX/TX 测试
 
 ### B13 — E77 串口识别错误
 
@@ -158,34 +148,6 @@
 
 ---
 
-## 快速参考表
-
-| ID | 简述 | 阶段 | 严重度 |
-|----|------|------|--------|
-| B01 | syscall 缺失 | 编译 | 高 |
-| B02 | 浮点 printf | 编译/运行 | 中 |
-| B03 | timespec 未定义 | 编译 | 高 |
-| B04 | pthread.h 缺失 | 编译 | 高 |
-| B05 | ESP-IDF 头文件 | 编译 | 高 |
-| B06 | JIT 类型缺失 | 编译 | 中 |
-| B07 | SX1250 opcode 掩码 | 运行 | **致命** |
-| B08 | SPI CS 时序 | 运行 | 高 |
-| B09 | LM75A 地址错误 | 运行 | 中 |
-| B10 | I2C 地址未左移 | 运行 | 高 |
-| B11 | const 限定符 | 编译 | 低 |
-| B12 | 宏重定义 | 编译 | 低 |
-| B13 | 串口识别 | 测试 | 低 |
-| B14 | SyncWord 不匹配 | 测试 | 高 |
-| B15 | CRC/IQ 不匹配 | 测试 | 高 |
-| B16 | stat 时间戳格式错误 | 集成 | **致命** |
-| B17 | 链接脚本未保护配置扇区 | 工程 | 高 |
-| B18 | rfconf.tx_enable 未赋值，下行 TX 全失败 | E2E 测试 | **致命** |
-| B19 | E77 入网后 AT 参数不可写 | 测试脚本 | 中 |
-
----
-
-## 阶段五：ChirpStack 集成
-
 ### B16 — stat 时间戳格式导致网关永不上线
 
 | 项目 | 内容 |
@@ -211,8 +173,6 @@
 | 详见 | [impl/06_freq_plan_flash_config_v4.md](../impl/06_freq_plan_flash_config_v4.md#part-4链接脚本-flash-区域保护) |
 
 ---
-
-## 阶段六：OTAA 端到端测试
 
 ### B18 — `rfconf.tx_enable` 未赋值导致 JoinAccept（所有下行）TX 全失败
 
@@ -260,8 +220,6 @@ if (lgw_rxrf_setconf(i, rfconf) != LGW_HAL_SUCCESS) { ... }
 | 修复验证 | 修复后连续三次运行 `otaa` 子命令，每次全部 AT 指令均返回 `OK`，无警告 |
 
 ---
-
-## 阶段七：SNTP 集成后 OLED 时间显示
 
 ### B20 — OLED Row 6 时间永久空白（多根因复合）
 
@@ -312,3 +270,72 @@ if (lgw_rxrf_setconf(i, rfconf) != LGW_HAL_SUCCESS) { ... }
 | 原因 | `void oled_refresh()` 丢弃所有 I2C 返回值，失败完全不可见，导致上述根因长时间未被发现 |
 | 修复 | `int err = 0; err |= ...` 累积模式；失败时打印 `[OLED] ERR: refresh failed (#N)`（最多 10 次） |
 | 文件 | `libloragw/loragw_oled.c` |
+
+---
+
+### B21 — DMA 已配置但实际未使用，残留文件干扰工程
+
+| 项目 | 内容 |
+|------|------|
+| 日期 | 2026-03-12 |
+| 现象 | CubeMX 生成 `Core/Src/dma.c` 和 `Core/Inc/dma.h`，但 SPI2/SPI3 均以阻塞（Blocking）模式调用 `HAL_SPI_TransmitReceive()`，无任何代码实际调用 DMA 传输函数；`dma.c` 仅做 MX_DMA_Init() 空初始化 |
+| 根因 | 历史上曾在 CubeMX 中为 SPI2 配置了 DMA（TX/RX），后来改用轮询模式但未在 CubeMX 中同步移除 DMA 配置；生成的文件保留但无实际用途 |
+| 修复 | 1. 在 CubeMX `.ioc` 中移除 SPI2 的 DMA Request 配置；2. 重新生成代码（不再生成 `dma.c`/`dma.h`）；3. 删除残留的 `Core/Src/dma.c` 和 `Core/Inc/dma.h`；4. 从 `cmake/stm32cubemx/CMakeLists.txt` 的 `MX_Application_Src` 中移除 `dma.c` 条目（HAL 层 `stm32f4xx_hal_dma.c` 保留，供 HAL 内部使用）|
+| 文件 | `Core/Src/dma.c`（已删除）、`Core/Inc/dma.h`（已删除）、`cmake/stm32cubemx/CMakeLists.txt` |
+| 验证 | `cmake --build --preset Debug -j8` 编译通过，无 DMA 相关警告 |
+
+---
+
+### B22 — `board_config.h` 头部注释引脚描述与实际不符
+
+| 项目 | 内容 |
+|------|------|
+| 日期 | 2026-03-12 |
+| 现象 | `board_config.h` 文件顶部注释中，SX1302 NSS 引脚描述与实际 CubeMX 配置不一致，误导性地指向错误引脚编号 |
+| 修复 | 注释修正为与 `main.h` CubeMX 宏定义一致：`NSS PD2 = GPIO_PIN_2`，`RESET PA8 = GPIO_PIN_8` |
+| 文件 | `libloragw/board_config.h` |
+| 影响 | 仅注释，不影响运行，但影响代码可读性和维护 |
+
+---
+
+### B23 — CubeMX 重新生成后 SPI3 时钟分频变化
+
+| 项目 | 内容 |
+|------|------|
+| 日期 | 2026-03-12 |
+| 现象 | CubeMX 重新生成 `spi.c` 后，SPI3（SX1302）`BaudRatePrescaler` 从原 `SPI_BAUDRATEPRESCALER_32`（≈1.3 MHz）变为 `SPI_BAUDRATEPRESCALER_8`（≈5.25 MHz）；SPI2（W5500）维持 `SPI_BAUDRATEPRESCALER_8`（≈5.25 MHz）|
+| 根因 | CubeMX `.ioc` 中 SPI3 的 Prescaler 参数被修改（可能是 CubeMX 版本升级或配置导入时的默认值变化）|
+| 影响评估 | SX1302 最高支持 10 MHz SPI 时钟；5.25 MHz 在规格范围内，实测验证通过后可接受；若通信出现异常可在 CubeMX 中回调至 ÷32 |
+| 验证 | 重新生成后完整编译通过；user code 区域（`freertos.c`、`stm32f4xx_it.c`、`main.c`）均未被覆盖 |
+| 文件 | `Core/Src/spi.c`（CubeMX 生成，不手动修改）|
+| 注意 | **外设参数（Prescaler 等）统一在 CubeMX 中调整，不直接修改 `spi.c` 生成代码** |
+
+---
+
+## 快速参考表
+
+| ID | 简述 | 严重度 |
+|----|------|--------|
+| B01 | syscall 缺失 | 高 |
+| B02 | 浮点 printf 不输出 | 中 |
+| B03 | timespec 未定义 | 高 |
+| B04 | pthread.h 缺失 | 高 |
+| B05 | ESP-IDF 头文件缺失 | 高 |
+| B06 | JIT 类型缺失 | 中 |
+| B07 | SX1250 opcode 掩码截断 | **致命** |
+| B08 | SPI CS 时序错误 | 高 |
+| B09 | LM75A 地址错误 | 中 |
+| B10 | I2C 地址未左移 | 高 |
+| B11 | const 限定符不匹配 | 低 |
+| B12 | 宏重定义 | 低 |
+| B13 | 串口识别错误 | 低 |
+| B14 | SyncWord 不匹配 | 高 |
+| B15 | CRC/IQ 设置不匹配 | 高 |
+| B16 | stat 时间戳格式错误 | **致命** |
+| B17 | 链接脚本未保护配置扇区 | 高 |
+| B18 | rfconf.tx_enable 未赋值，下行 TX 全失败 | **致命** |
+| B19 | E77 入网后 AT 参数不可写 | 中 |
+| B20 | OLED Row 6 永久空白（多根因复合） | 高 |
+| B21 | DMA 残留文件（未使用但保留） | 中 |
+| B22 | board_config.h 注释引脚描述错误 | 低 |
+| B23 | CubeMX 重新生成后 SPI3 分频变化 | 低 |

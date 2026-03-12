@@ -35,7 +35,28 @@ SX1302 通过 SPI3 总线连接。CubeMX 中配置为 Full-Duplex Master, MSB Fi
 
 ### SPI 时钟分频
 
-CubeMX 中 SPI3 挂在 APB1 (42 MHz) 上，分频系数设为 32，实际 SPI 时钟 ≈ 1.3125 MHz。SX1302 最高支持 10 MHz，实测 1.3 MHz 稳定可靠。
+CubeMX 中 SPI3 挂在 APB1 (42 MHz) 上，分频系数设为 8，实际 SPI 时钟 ≈ 5.25 MHz。SX1302 最高支持 10 MHz，5.25 MHz 在规格范围内，实测验证通过。
+
+> **变更记录**：2026-03-12 CubeMX 重新生成后分频系数从 32（1.3125 MHz）变为 8（5.25 MHz），见 [troubleshooting/bugs_and_fixes.md B23](../troubleshooting/bugs_and_fixes.md)。
+
+## SPI2 — W5500
+
+W5500 以太网芯片通过 SPI2 总线连接。CubeMX 中配置为 Full-Duplex Master, MSB First, CPOL=0 CPHA=0, 8bit。
+
+| 信号 | 引脚 | 说明 |
+|------|------|------|
+| SCK | PB10 | SPI2_SCK |
+| MISO | PC2 | SPI2_MISO |
+| MOSI | PC3 | SPI2_MOSI |
+| NSS | PA3 | **软件控制 GPIO**（W5500_NSS） |
+| RESET | PA2 | W5500 硬件复位（低有效） |
+
+### SPI 时钟分频
+
+SPI2 同样挂在 APB1 (42 MHz) 上，当前分频系数为 8，实际 SPI 时钟 ≈ 5.25 MHz。
+W5500 最高支持 80 MHz，5.25 MHz 为保守配置，适合初版 PCB（无阻抗控制）。
+如需提升网络吞吐，可在 CubeMX 中将分频调整至 4（≈ 10.5 MHz）。
+详细速率选型分析见 [impl/04_w5500_ethernet.md](../impl/04_w5500_ethernet.md)。
 
 ## I2C2 — OLED / LM75A
 
