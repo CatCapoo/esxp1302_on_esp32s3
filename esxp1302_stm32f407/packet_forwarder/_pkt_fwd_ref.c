@@ -4419,12 +4419,12 @@ void app_main(void)
     int reboot_delay_s;
     bool soft_ap_mode = false;
 
-    printf("\n\n*** ESXP1302 Gateway. Version: %s ***\n\n\n", EXSP1302_VERSION);
+    printf("\n\n*** ESXP1302 Gateway. Version: %s ***\n\n\n", ESXP1302_VERSION);
 
     oled_init();
     oled_cls();
     oled_show_str(0, 0, "ESXP1302 GATEWAY", 2);
-    sprintf(out_info,   "            (v%s)", EXSP1302_VERSION);
+    sprintf(out_info,   "            (v%s)", ESXP1302_VERSION);
     oled_show_one_line(0, 2, out_info, 1);
 
     if(USER_BUTTON_1 != GPIO_NUM_NC){

@@ -103,56 +103,6 @@
 
 /*
  * ============================================================================
- * PACKET FORWARDING BEHAVIOUR
- * ============================================================================
- */
-
-/* Forward packets with valid CRC */
-#define GW_DEFAULT_FWD_CRC_VALID    1
-
-/* Forward packets with invalid CRC (0 = discard bad CRC packets) */
-#define GW_DEFAULT_FWD_CRC_ERROR    0
-
-/* Forward packets with CRC disabled */
-#define GW_DEFAULT_FWD_CRC_DISABLED 0
-
-/* Keepalive interval for PULL_DATA in seconds */
-#define GW_DEFAULT_KEEPALIVE_SEC    10
-
-/* Statistics reporting interval in seconds */
-#define GW_DEFAULT_STAT_INTERVAL    30
-
-/* PUSH_DATA acknowledgement timeout in ms */
-#define GW_DEFAULT_PUSH_TIMEOUT_MS  500
-
-/*
- * ============================================================================
- * GPS (currently disabled on STM32 port)
- * ============================================================================
- * GPS is not yet ported to STM32. The following defines reserve configuration
- * space for a future GPS port. Set GPS_ENABLE to 1 to enable.
- */
-#define GW_GPS_ENABLE               0
-
-/* Reference coordinates (used as fallback when GPS is absent) */
-#define GW_DEFAULT_REF_LAT          0.0
-#define GW_DEFAULT_REF_LON          0.0
-#define GW_DEFAULT_REF_ALT          0
-
-/*
- * ============================================================================
- * BEACON (Class B — currently not implemented)
- * ============================================================================
- */
-#define GW_DEFAULT_BEACON_PERIOD    0         /* 0 = disabled */
-#define GW_DEFAULT_BEACON_FREQ_HZ   508300000 /* Hz (CN470 beacon channel) */
-#define GW_DEFAULT_BEACON_DR        9
-#define GW_DEFAULT_BEACON_BW_HZ     125000
-#define GW_DEFAULT_BEACON_POWER     14
-#define GW_DEFAULT_BEACON_INFODESC  0
-
-/*
- * ============================================================================
  * FLASH STORAGE
  * ============================================================================
  * Config is stored in STM32F407ZGTx Flash Sector 11 (0x080E0000, 128 KB).

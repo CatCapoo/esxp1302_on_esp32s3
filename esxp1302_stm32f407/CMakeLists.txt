@@ -7,6 +7,32 @@ cmake_minimum_required(VERSION 3.22)
 # User is free to modify the file as much as necessary
 #
 
+# --------------------------------------------------------------------------
+# global_json.h: auto-generate from JSON configs before build
+#
+# Source files  : packet_forwarder/global_conf.json/*.json
+# Generated file: packet_forwarder/global_json.h  (do not edit manually)
+# Script        : scripts/gen_global_json.py
+# --------------------------------------------------------------------------
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+set(GLOBAL_JSON_H   ${CMAKE_CURRENT_SOURCE_DIR}/packet_forwarder/global_json.h)
+set(GEN_SCRIPT      ${CMAKE_CURRENT_SOURCE_DIR}/scripts/gen_global_json.py)
+set(JSON_CONF_DIR   ${CMAKE_CURRENT_SOURCE_DIR}/packet_forwarder/global_conf.json)
+
+add_custom_command(
+    OUTPUT  ${GLOBAL_JSON_H}
+    COMMAND ${Python3_EXECUTABLE} ${GEN_SCRIPT}
+    DEPENDS ${JSON_CONF_DIR}/global_conf.cn490.json
+            ${JSON_CONF_DIR}/global_conf.eu868.json
+            ${JSON_CONF_DIR}/global_conf.us915.json
+            ${GEN_SCRIPT}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Generating global_json.h from JSON configs"
+    VERBATIM
+)
+add_custom_target(generate_global_json DEPENDS ${GLOBAL_JSON_H})
+
 # Setup compiler settings
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -34,6 +60,9 @@ message("Build type: " ${CMAKE_BUILD_TYPE})
 
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME})
+
+# global_json.h must exist before any source file that #includes it is compiled
+add_dependencies(${CMAKE_PROJECT_NAME} generate_global_json)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
@@ -160,6 +189,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Build mode selection  –  uncomment exactly ONE of the following lines
 # ---------------------------------------------------------------------------
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
+    VERSION_STRING="ESXP1302-v0.9.0"  # shown in banner: *** Packet Forwarder *** Version: ...
     # TEST_LORAGW_SPI             # SPI read/write stress test
     # TEST_LORAGW_SPI_SX1250      # SX1250 register R/W via SX1302
     # TEST_LORAGW_REG             # SX1302 register default-value & R/W test

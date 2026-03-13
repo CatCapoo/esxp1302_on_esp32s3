@@ -13,3 +13,7 @@ build/
 
 # Editor
 .DS_Store
+
+# Auto-generated from JSON configs — do not edit manually, do not commit
+packet_forwarder/global_json.h
+
