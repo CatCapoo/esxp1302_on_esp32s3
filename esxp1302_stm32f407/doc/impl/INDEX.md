@@ -12,6 +12,7 @@
 | [07_sntp_configuration.md](07_sntp_configuration.md) | SNTP 配置速查 |
 | [08_oled_display_bug.md](08_oled_display_bug.md) | OLED 第 6 行永久空白 Bug 分析与修复 |
 | [09_ccmram_optimization.md](09_ccmram_optimization.md) | CCMRAM 优化：大型静态变量迁移，SRAM 95% → 74% |
+| [10_config_cleanup.md](10_config_cleanup.md) | 配置整理：global_conf.json 构建管道、gateway_defaults.h 清理、版本号修复 |
 
 ## 阅读顺序
 

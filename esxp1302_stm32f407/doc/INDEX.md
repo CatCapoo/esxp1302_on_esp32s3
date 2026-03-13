@@ -29,6 +29,8 @@
 | 10.2 | [impl/07_sntp_configuration.md](impl/07_sntp_configuration.md) | SNTP 功能配置清单（网络、Flash 参数、CMake、CubeMX） |
 | 11 | [learning/06_stm32_i2c_freertos.md](learning/06_stm32_i2c_freertos.md) | STM32 I2C + FreeRTOS 陷阱（Errata ES0182、HAL_LOCK、Mutex） |
 | 11.1 | [impl/08_oled_display_bug.md](impl/08_oled_display_bug.md) | OLED Row 6 永久空白 Bug 全程分析（5秒窗口、超时、BUSY锁死、竞态） |
+| 12 | [impl/09_ccmram_optimization.md](impl/09_ccmram_optimization.md) | CCMRAM 优化：大型静态变量迁移，SRAM 95% → 74% |
+| 12.1 | [impl/10_config_cleanup.md](impl/10_config_cleanup.md) | 配置整理：global_conf.json 构建管道、gateway_defaults.h 清理（16 个死代码宏）、版本号修复 |
 
 ---
 
@@ -46,6 +48,8 @@
 - [impl/07_sntp_implementation.md](impl/07_sntp_implementation.md) — SNTP 代码实现剖析（软件时钟、调用链、5级回退、Newlib桥接）
 - [impl/07_sntp_configuration.md](impl/07_sntp_configuration.md) — SNTP 功能配置清单（Flash参数、CMake、CubeMX、网络前提）
 - [impl/08_oled_display_bug.md](impl/08_oled_display_bug.md) — OLED Row 6 永久空白 Bug：5秒窗口 + I2C超时 + BUSY Errata + 无Mutex + 沉默失败
+- [impl/09_ccmram_optimization.md](impl/09_ccmram_optimization.md) — CCMRAM 优化：jit_queue/debugconf/rx_buffer 迁移，SRAM 95% → 74%
+- [impl/10_config_cleanup.md](impl/10_config_cleanup.md) — 配置整理：global_conf.json 构建管道（Python gen脚本 + CMake auto-gen）、gateway_defaults.h 清理（16 个死宏）、版本号拼写修复、VERSION_STRING 补充定义
 
 ### 测试流程 / 脚本
 - [testing/01_bringup_tests.md](testing/01_bringup_tests.md) — 底层外设测试
@@ -95,3 +99,7 @@
 | `sntp_gettimeofday.c` | Newlib `_gettimeofday()` 强符号桥接 | [impl/07](impl/07_sntp_implementation.md) |
 | `loragw_i2c.c/h` | I2C2 驱动（FreeRTOS Mutex、动态超时、BUSY恢复） | [impl/08](impl/08_oled_display_bug.md) |
 | `loragw_oled.c/h` | SSD1306 OLED 驱动（帧缓冲、err\|=累积） | [impl/08](impl/08_oled_display_bug.md) |
+| `gateway_defaults.h` | 编译期 Flash 配置默认值（保留 12 个有效宏） | [impl/10](impl/10_config_cleanup.md) |
+| `loragw_version.h` | 固件版本号宏 `ESXP1302_VERSION` | [impl/10](impl/10_config_cleanup.md) |
+| `global_conf.json/*.json` | 各频率计划 JSON 源文件（CN470/EU868/US915） | [impl/10](impl/10_config_cleanup.md) |
+| `scripts/gen_global_json.py` | JSON → `global_json.h` 转换脚本（2字节长度前缀格式） | [impl/10](impl/10_config_cleanup.md) |
