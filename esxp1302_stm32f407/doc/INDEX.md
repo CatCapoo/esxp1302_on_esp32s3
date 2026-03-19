@@ -31,6 +31,7 @@
 | 11.1 | [impl/08_oled_display_bug.md](impl/08_oled_display_bug.md) | OLED Row 6 永久空白 Bug 全程分析（5秒窗口、超时、BUSY锁死、竞态） |
 | 12 | [impl/09_ccmram_optimization.md](impl/09_ccmram_optimization.md) | CCMRAM 优化：大型静态变量迁移，SRAM 95% → 74% |
 | 12.1 | [impl/10_config_cleanup.md](impl/10_config_cleanup.md) | 配置整理：global_conf.json 构建管道、gateway_defaults.h 清理（16 个死代码宏）、版本号修复 |
+| 13 | [impl/11_pin_remap_spi1_i2c1.md](impl/11_pin_remap_spi1_i2c1.md) | CubeMX 引脚重映射：SX1302 SPI3→SPI1，NSS PB12→PA4，RESET PD9→PC4；OLED/LM75A I2C2→I2C1 |
 
 ---
 
@@ -50,6 +51,7 @@
 - [impl/08_oled_display_bug.md](impl/08_oled_display_bug.md) — OLED Row 6 永久空白 Bug：5秒窗口 + I2C超时 + BUSY Errata + 无Mutex + 沉默失败
 - [impl/09_ccmram_optimization.md](impl/09_ccmram_optimization.md) — CCMRAM 优化：jit_queue/debugconf/rx_buffer 迁移，SRAM 95% → 74%
 - [impl/10_config_cleanup.md](impl/10_config_cleanup.md) — 配置整理：global_conf.json 构建管道（Python gen脚本 + CMake auto-gen）、gateway_defaults.h 清理（16 个死宏）、版本号拼写修复、VERSION_STRING 补充定义
+- [impl/11_pin_remap_spi1_i2c1.md](impl/11_pin_remap_spi1_i2c1.md) — 引脚重映射：SX1302 SPI3→SPI1 (PA5/PA6/PA7)，NSS PB12→PA4，RESET PD9→PC4；OLED/LM75A I2C2→I2C1 (PB6/PB7)；修复 _sccmram extern 声明
 
 ### 测试流程 / 脚本
 - [testing/01_bringup_tests.md](testing/01_bringup_tests.md) — 底层外设测试

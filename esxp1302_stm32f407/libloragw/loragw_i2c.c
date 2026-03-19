@@ -1,18 +1,18 @@
 /*
- * loragw_i2c.c  –  STM32F407 I2C master wrapper (HAL I2C2)
+ * loragw_i2c.c  –  STM32F407 I2C master wrapper (HAL I2C1)
  *
- * CubeMX already initialises I2C2 via MX_I2C2_Init() in main.c before
+ * CubeMX already initialises I2C1 via MX_I2C1_Init() in main.c before
  * FreeRTOS starts.  This module just provides a thin adapter layer so the
  * upper-level drivers (LM75A, OLED …) stay platform-agnostic.
  *
- * IMPORTANT: I2C2 is shared between the OLED (SSD1306) and the temperature
+ * IMPORTANT: I2C1 is shared between the OLED (SSD1306) and the temperature
  * sensor (LM75A).  The OLED is updated from the main pkt_fwd task while
  * thread_up calls lgw_receive() → lgw_get_temperature() → I2C read from
  * a higher-priority task.  STM32 HAL's __HAL_LOCK is a simple flag check
  * that is NOT safe under FreeRTOS pre-emption, so concurrent HAL I2C calls
  * can corrupt the peripheral state and cause silent failures (HAL_BUSY).
  *
- * Fix: a FreeRTOS mutex serialises every I2C2 operation.
+ * Fix: a FreeRTOS mutex serialises every I2C1 operation.
  */
 
 #include <string.h>
@@ -20,9 +20,9 @@
 #include <stdio.h>
 #include "loragw_i2c.h"
 #include "board_config.h"   /* I2C_HANDLE */
-#include "i2c.h"            /* hi2c2 extern */
+#include "i2c.h"            /* hi2c1 extern */
 
-/* FreeRTOS mutex for I2C2 bus serialisation */
+/* FreeRTOS mutex for I2C1 bus serialisation */
 #include "FreeRTOS.h"
 #include "semphr.h"
 

@@ -70,10 +70,10 @@ void Error_Handler(void);
 #define W5500_RES_GPIO_Port GPIOA
 #define W5500_NSS_Pin GPIO_PIN_3
 #define W5500_NSS_GPIO_Port GPIOA
-#define SX1302_RESET_Pin GPIO_PIN_8
-#define SX1302_RESET_GPIO_Port GPIOA
-#define SX1302_NSS_Pin GPIO_PIN_2
-#define SX1302_NSS_GPIO_Port GPIOD
+#define SX1302_NSS_Pin GPIO_PIN_4
+#define SX1302_NSS_GPIO_Port GPIOA
+#define SX1302_RESET_Pin GPIO_PIN_4
+#define SX1302_RESET_GPIO_Port GPIOC
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

@@ -193,8 +193,8 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # TEST_LORAGW_SPI             # SPI read/write stress test
     # TEST_LORAGW_SPI_SX1250      # SX1250 register R/W via SX1302
     # TEST_LORAGW_REG             # SX1302 register default-value & R/W test
-    # TEST_LORAGW_I2C_OLED        # SSD1306 OLED on I2C2
-    # TEST_LORAGW_I2C_LM75A      # LM75A temperature sensor on I2C2
+    # TEST_LORAGW_I2C_OLED        # SSD1306 OLED on I2C1
+    # TEST_LORAGW_I2C_LM75A      # LM75A temperature sensor on I2C1
     # TEST_W5500_UDP              # W5500 Ethernet + UDP echo test
     # TEST_CONFIG_CLI             # Flash config R/W + UART CLI validation
     PKT_FWD                     # Full packet forwarder mode

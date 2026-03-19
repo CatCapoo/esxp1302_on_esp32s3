@@ -19,25 +19,25 @@
 | 串口输出 | USART1 → USB CH340 (printf 重定向) |
 | CubeMX 版本 | STM32CubeCLT 1.21.0 |
 
-## SPI3 — SX1302
+## SPI1 — SX1302
 
-SX1302 通过 SPI3 总线连接。CubeMX 中配置为 Full-Duplex Master, MSB First, CPOL=0 CPHA=0, 8bit。
+SX1302 通过 SPI1 总线连接。CubeMX 中配置为 Full-Duplex Master, MSB First, CPOL=0 CPHA=0, 8bit。
 
 | 信号 | 引脚 | 说明 |
 |------|------|------|
-| SCK | PC10 | SPI3_SCK |
-| MISO | PC11 | SPI3_MISO |
-| MOSI | PC12 | SPI3_MOSI |
-| NSS | PB12 | **软件控制 GPIO**（非硬件 NSS） |
-| RESET | PD9 | SX1302 RESET（高有效） |
+| SCK | PA5 | SPI1_SCK |
+| MISO | PA6 | SPI1_MISO |
+| MOSI | PA7 | SPI1_MOSI |
+| NSS | PA4 | **软件控制 GPIO**（非硬件 NSS） |
+| RESET | PC4 | SX1302 RESET（高有效） |
 
 > **关键点**：NSS 使用软件 GPIO 手动控制（`cs_select()` / `cs_deselect()`），不使用 SPI 硬件 NSS，因为 SX1302 的 SPI 协议需要在每个事务期间保持 CS 低电平。
 
 ### SPI 时钟分频
 
-CubeMX 中 SPI3 挂在 APB1 (42 MHz) 上，分频系数设为 8，实际 SPI 时钟 ≈ 5.25 MHz。SX1302 最高支持 10 MHz，5.25 MHz 在规格范围内，实测验证通过。
+CubeMX 中 SPI1 挂在 APB2 (84 MHz) 上，分频系数设为 16，实际 SPI 时钟 ≈ 5.25 MHz。SX1302 最高支持 10 MHz，5.25 MHz 在规格范围内，实测验证通过。
 
-> **变更记录**：2026-03-12 CubeMX 重新生成后分频系数从 32（1.3125 MHz）变为 8（5.25 MHz），见 [troubleshooting/bugs_and_fixes.md B23](../troubleshooting/bugs_and_fixes.md)。
+> **变更记录**：2026-03-19 由 SPI3 (PC10/PC11/PC12, NSS=PB12, RESET=PD9) 切换至 SPI1 (PA5/PA6/PA7, NSS=PA4, RESET=PC4)，见 [impl/11_pin_remap_spi1_i2c1.md](../impl/11_pin_remap_spi1_i2c1.md)。
 
 ## SPI2 — W5500
 
@@ -58,14 +58,16 @@ W5500 最高支持 80 MHz，5.25 MHz 为保守配置，适合初版 PCB（无阻
 如需提升网络吞吐，可在 CubeMX 中将分频调整至 4（≈ 10.5 MHz）。
 详细速率选型分析见 [impl/04_w5500_ethernet.md](../impl/04_w5500_ethernet.md)。
 
-## I2C2 — OLED / LM75A
+## I2C1 — OLED / LM75A
 
 | 信号 | 引脚 | 说明 |
 |------|------|------|
-| SDA | PF0 | I2C2_SDA（开漏 + 外部上拉） |
-| SCL | PF1 | I2C2_SCL（开漏 + 外部上拉） |
+| SCL | PB6 | I2C1_SCL（开漏 + 外部上拉） |
+| SDA | PB7 | I2C1_SDA（开漏 + 外部上拉） |
 
 CubeMX 配置：Standard Mode (100 kHz)。
+
+> **变更记录**：2026-03-19 由 I2C2 (PF0-SDA/PF1-SCL) 切换至 I2C1 (PB6-SCL/PB7-SDA)，见 [impl/11_pin_remap_spi1_i2c1.md](../impl/11_pin_remap_spi1_i2c1.md)。
 
 ### I2C 设备地址
 
@@ -78,8 +80,8 @@ CubeMX 配置：Standard Mode (100 kHz)。
 
 | 引脚 | 功能 | 模式 | 说明 |
 |------|------|------|------|
-| PB12 | SX1302_NSS | Output, Push-Pull, High | SPI CS 软件控制 |
-| PD9 | SX1302_RESET | Output, Push-Pull, Low | 高电平复位 |
+| PA4 | SX1302_NSS | Output, Push-Pull, High | SPI CS 软件控制 |
+| PC4 | SX1302_RESET | Output, Push-Pull, Low | 高电平复位 |
 | PF9 | LED0 | Output | 调试指示 |
 | PF10 | LED1 | Output | 调试指示 |
 | PE4 | KEY0 | Input, Pull-Up | 用户按键 |
@@ -163,7 +165,7 @@ TIM2 配置为 32-bit 自由运行计数器，时钟 84 MHz，预分频 84-1，�
 
 ```c
 /* SPI */
-#define SX1302_SPI_HANDLE   (&hspi3)
+#define SX1302_SPI_HANDLE   (&hspi1)
 #define SX1302_NSS_PORT     SX1302_NSS_GPIO_Port
 #define SX1302_NSS_PIN      SX1302_NSS_Pin
 
@@ -172,7 +174,7 @@ TIM2 配置为 32-bit 自由运行计数器，时钟 84 MHz，预分频 84-1，�
 #define SX1302_RESET_PIN_NUM SX1302_RESET_Pin
 
 /* I2C */
-#define I2C_HANDLE          (&hi2c2)
+#define I2C_HANDLE          (&hi2c1)
 #define I2C_TIMEOUT_MS      100
 ```
 

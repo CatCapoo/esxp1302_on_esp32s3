@@ -31,12 +31,6 @@
 #include <string.h>
 /* USER CODE END Includes */
 
-/* USER CODE BEGIN ETM */
-/* CCMRAM section boundaries — defined in linker script */
-extern uint32_t _sccmram;
-extern uint32_t _eccmram;
-/* USER CODE END ETM */
-
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
@@ -54,7 +48,9 @@ extern uint32_t _eccmram;
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+/* Linker-script symbols for CCMRAM section (defined in STM32F407ZGTx_FLASH.ld) */
+extern uint32_t _sccmram;
+extern uint32_t _eccmram;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -105,9 +101,9 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM2_Init();
   MX_USART1_UART_Init();
-  MX_SPI3_Init();
-  MX_I2C2_Init();
   MX_SPI2_Init();
+  MX_I2C1_Init();
+  MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   /* 启动 TIM2 微秒定时器 */
   HAL_TIM_Base_Start(&htim2);
