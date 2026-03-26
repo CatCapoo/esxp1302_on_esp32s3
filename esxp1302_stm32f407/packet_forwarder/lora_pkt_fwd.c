@@ -312,6 +312,33 @@ static void oled_show_one_line(uint8_t col, uint8_t row, const char *str)
     oled_refresh();
 }
 
+/* Draw one OLED line without refresh (used for boot progress multi-line update) */
+static void oled_draw_one_line_norefresh(uint8_t col, uint8_t row, const char *str)
+{
+    char buf[N_CHAR_A_ROW + 1];
+    memset(buf, ' ', N_CHAR_A_ROW);
+    buf[N_CHAR_A_ROW] = '\0';
+
+    int len = strlen(str);
+    if (len > N_CHAR_A_ROW) len = N_CHAR_A_ROW;
+    memcpy(buf, str, len);
+
+    oled_draw_string(col, row, buf);
+}
+
+/* Boot screen: show loading step as soon as possible after power-on */
+static void oled_boot_progress(uint8_t step, uint8_t total, const char *msg)
+{
+    char line[24];
+
+    oled_draw_one_line_norefresh(0, 0, "STM32 LORA GATEWAY");
+    snprintf(line, sizeof line, "Loading %u/%u", step, total);
+    oled_draw_one_line_norefresh(0, 1, line);
+    oled_draw_one_line_norefresh(0, 2, msg);
+    oled_draw_one_line_norefresh(0, 3, "Please wait...");
+    oled_refresh();
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Forward declarations                                                      */
 /* -------------------------------------------------------------------------- */
@@ -2081,6 +2108,8 @@ int pkt_fwd_main(void)
 
     /* OLED display buffer */
     char out_info[96];
+    bool oled_ok = false;
+    const uint8_t boot_total_steps = 8;
 
     /* ============== Create Mutexes ============== */
     mx_concent = xSemaphoreCreateMutex();     assert(mx_concent);
@@ -2089,15 +2118,19 @@ int pkt_fwd_main(void)
     mx_meas_dw = xSemaphoreCreateMutex();     assert(mx_meas_dw);
     mx_stat_rep = xSemaphoreCreateMutex();    assert(mx_stat_rep);
 
+    /* Initialize OLED display as early as possible to avoid black screen on boot */
+    if (oled_init() != 0) {
+        MSG("WARNING: OLED init failed\n");
+    } else {
+        oled_ok = true;
+        oled_boot_progress(1, boot_total_steps, "Power-on init");
+    }
+
     /* Load gateway config from Flash (or apply defaults if Flash is blank).
      * Must be before net_init() so gWIZNETINFO gets the correct eth_ip. */
     uart_cli_init();
+    if (oled_ok) oled_boot_progress(2, boot_total_steps, "Load flash config");
     config_load();
-
-    /* Initialize OLED display */
-    if (oled_init() != 0) {
-        MSG("WARNING: OLED init failed\n");
-    }
 
     /* Redirect Parson JSON allocations to FreeRTOS heap.
      * Must be done before any json_parse_* call.
@@ -2129,6 +2162,8 @@ int pkt_fwd_main(void)
         gateway_config_t *_fcfg = config_get();
         freq_region_t _region = (freq_region_t)_fcfg->freq_region;
 
+        if (oled_ok) oled_boot_progress(3, boot_total_steps, "Load region profile");
+
         if (_region == FREQ_REGION_EU868) {
             MSG("INFO: Loading EU868 config (region=%u, free heap %u)...\n",
                 (unsigned)_region, (unsigned)xPortGetFreeHeapSize());
@@ -2158,6 +2193,7 @@ int pkt_fwd_main(void)
     }
 
     /* parse concentrator, gateway, debug configuration */
+    if (oled_ok) oled_boot_progress(4, boot_total_steps, "Parse JSON config");
     x = parse_SX130x_configuration(conf_array);
     if (x != 0) {
         MSG("ERROR: failed to parse SX130x configuration\n");
@@ -2227,6 +2263,7 @@ int pkt_fwd_main(void)
     net_mac_l = pkt_htonl((unsigned int)(0xFFFFFFFF & lgwm));
 
     /* ============== Initialize W5500 Network ============== */
+    if (oled_ok) oled_boot_progress(5, boot_total_steps, "Init W5500 network");
     if (net_init() != NET_OK) {
         MSG("ERROR: failed to initialize W5500 network\n");
         return -1;
@@ -2257,6 +2294,7 @@ int pkt_fwd_main(void)
     sntp_task_start(cfg->eth_gw, cfg->eth_ip, ns_ip);
 
     /* ============== Board Reset & Start Concentrator ============== */
+    if (oled_ok) oled_boot_progress(6, boot_total_steps, "Start concentrator");
     lgw_reset();
 
     for (l = 0; l < LGW_IF_CHAIN_NB; l++) {
@@ -2282,6 +2320,7 @@ int pkt_fwd_main(void)
     jit_queue_init(&jit_queue[1]);
 
     /* ============== Create FreeRTOS Tasks ============== */
+    if (oled_ok) oled_boot_progress(7, boot_total_steps, "Create RTOS tasks");
     /* Stack sizes reduced for STM32 RAM constraints */
     if (xTaskCreate(thread_up, "thread_up", 2048, NULL, osPriorityAboveNormal, &pThreadUp) != pdPASS) {
         MSG("ERROR: failed to create thread_up\n");
@@ -2307,22 +2346,26 @@ int pkt_fwd_main(void)
         MSG("INFO: thread_cli created (UART config CLI active)\n");
     }
 
+    if (oled_ok) oled_boot_progress(8, boot_total_steps, "Gateway ready");
+
     /* OLED startup screen rows 0-4 (written into framebuf now, flushed together with row 5) */
     {
         gateway_config_t *cfg2 = config_get();
-        oled_draw_string(0, 0, "ESXP1302 STM32  ");
-        snprintf(out_info, sizeof out_info, "EUI:%08X", (unsigned int)(lgwm >> 32));
+        oled_draw_string(0, 0, "STM32 LORA GATEWAY  ");
+        snprintf(out_info, sizeof out_info, "EUI:%08X %08X", (unsigned int)(lgwm >> 32), (unsigned int)(lgwm & 0xFFFFFFFFu));
         oled_draw_string(0, 1, out_info);
-        snprintf(out_info, sizeof out_info, "    %08X", (unsigned int)(lgwm & 0xFFFFFFFFu));
-        oled_draw_string(0, 2, out_info);
+        // snprintf(out_info, sizeof out_info, "    %08X", (unsigned int)(lgwm & 0xFFFFFFFFu));
+        // oled_draw_string(13, 1, out_info);
         snprintf(out_info, sizeof out_info, "IP:%d.%d.%d.%d",
                  cfg2->eth_ip[0], cfg2->eth_ip[1], cfg2->eth_ip[2], cfg2->eth_ip[3]);
-        oled_draw_string(0, 3, out_info);
-        oled_draw_string(0, 4, "Concentrator OK ");
+        oled_draw_string(0, 2, out_info);
+        oled_draw_string(0, 3, "Concentrator OK ");
     }
     /* Update NS info on OLED */
-    snprintf(out_info, sizeof out_info, "NS=%d.%d.%d.%d:%u",
-             ns_ip[0], ns_ip[1], ns_ip[2], ns_ip[3], ns_port_up);
+    snprintf(out_info, sizeof out_info, "NS_IP=%d.%d.%d.%d",
+             ns_ip[0], ns_ip[1], ns_ip[2], ns_ip[3]);
+    oled_show_one_line(0, 4, out_info);
+    snprintf(out_info, sizeof out_info, "NS_PORT=%u", ns_port_up);
     oled_show_one_line(0, 5, out_info);
 
     /* Show initial uptime on OLED row 6 immediately so it's never blank.
@@ -2502,7 +2545,7 @@ int pkt_fwd_main(void)
             printf("### Concentrator temperature unknown ###\n");
         } else {
             printf("### Concentrator temperature: %.0f C ###\n", temperature);
-            snprintf(out_info, 22, "Temp=%.1fC GPS=(N/A)", temperature);
+            snprintf(out_info, 22, "Temp=%.1fC", temperature);
             oled_show_one_line(0, 7, out_info);
         }
         printf("##### END #####\n");

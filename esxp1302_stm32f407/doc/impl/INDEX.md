@@ -13,6 +13,8 @@
 | [08_oled_display_bug.md](08_oled_display_bug.md) | OLED 第 6 行永久空白 Bug 分析与修复 |
 | [09_ccmram_optimization.md](09_ccmram_optimization.md) | CCMRAM 优化：大型静态变量迁移，SRAM 95% → 74% |
 | [10_config_cleanup.md](10_config_cleanup.md) | 配置整理：global_conf.json 构建管道、gateway_defaults.h 清理、版本号修复 |
+| [11_pin_remap_spi1_i2c1.md](11_pin_remap_spi1_i2c1.md) | 引脚重映射：SX1302 切换至 SPI1，OLED/LM75A 切换至 I2C1 |
+| [12_oled_boot_screen.md](12_oled_boot_screen.md) | OLED 启动画面：上电即显示加载进度，消除黑屏；完整显示布局与刷新逻辑 |
 
 ## 阅读顺序
 
